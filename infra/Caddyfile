@@ -1,0 +1,29 @@
+# Caddyfile - Automatic HTTPS reverse proxy for Media Ops API
+# Replace 'api.mediaops.yourdomain.edu' with your actual domain.
+
+api.mediaops.yourdomain.edu {
+    # Reverse proxy to FastAPI backend
+    reverse_proxy localhost:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Request body size limit
+    request_body {
+        max_size 25MB
+    }
+
+    log {
+        output file /var/log/caddy/media_ops_access.log
+    }
+}
