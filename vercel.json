@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd mobile && npm install && npm run build:web",
+  "outputDirectory": "mobile/dist",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/((?!_expo|assets|favicon|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
