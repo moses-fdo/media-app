@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$ApiUrl,
     [switch]$Production,
+    [switch]$EnableDemo,
     [switch]$SkipInstall,
     [switch]$Reinstall,
     [string]$SdkRoot,
@@ -48,7 +49,7 @@ try {
     & (Join-Path $PSScriptRoot 'ensure-windows-ninja.ps1') -SdkRoot $env:ANDROID_HOME
     $env:APP_ENV = if ($Production) { 'production' } else { 'preview' }
     $env:EXPO_PUBLIC_API_URL = $ApiUrl.TrimEnd('/')
-    $env:EXPO_PUBLIC_DEMO_ENABLED = if ($Production) { 'false' } else { 'true' }
+    $env:EXPO_PUBLIC_DEMO_ENABLED = if ($EnableDemo) { 'true' } else { 'false' }
     # Windows/MSIX AppData redirection can break Java's Unix-domain selector sockets.
     # Apply this to Gradle and its Java/Kotlin child processes as well as the launcher.
     $socketRoot = Join-Path $mobileRoot '.gradle-sockets'
