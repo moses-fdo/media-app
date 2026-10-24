@@ -26,6 +26,7 @@ function Routes(){
       <Stack screenOptions={{headerStyle:{backgroundColor:c.bg},headerTintColor:c.blue,headerShadowVisible:false,contentStyle:{backgroundColor:c.bg},headerBackTitle:'Back'}}>
         <Stack.Screen name="(tabs)" options={{headerShown:false}}/>
         <Stack.Screen name="sign-in" options={{headerShown:false}}/>
+        <Stack.Screen name="auth" options={{headerShown:false}}/>
         <Stack.Screen name="requests/[id]" options={{title:'',headerBackTitle:'Requests',headerLeft:makeHeaderLeft(c,'/','Requests')}}/>
         <Stack.Screen name="requests/new" options={{title:'Add request',presentation:'modal'}}/>
         <Stack.Screen name="source" options={{title:'Source email',headerLeft:makeHeaderLeft(c,'/','Back')}}/>

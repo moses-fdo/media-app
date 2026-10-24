@@ -102,18 +102,37 @@ def parse_template_sections(text: str) -> dict[str, str]:
             sections[current_key] = sections.get(current_key, '') + '\n' + line
     return sections
 
-MEDIA_TAG_PATTERNS = [
+NON_MEDIA_SUBJECT_PATTERNS = [
+    r'\bcircular\b',
+    r'\budemy\b',
+    r'\bfellowship\b',
+    r'\bhackathon\b',
+    r'\bawareness\s*pledge\b',
+    r'\bstudent\s*representatives\b',
+    r'\belection\b',
+    r'\bfeedback\s*form\b',
+    r'\bjob\s*alert\b',
+    r'\bcongratulations\b',
+    r'\bcondolence\b',
+    r'\bwebinar\b',
+    r'\bcourse\s*access\b',
+    r'\bcall\s*for\s*applications\b',
+    r'\bquantumania\b',
+    r'\bastras?\b',
+]
+
+MEDIA_SUBJECT_PATTERNS = [
     r'\[media\s*request\]',
     r'\[media\]',
     r'\bmedia\s*request\b',
     r'\bmedia\s*requirement[s]?\b',
-    r'\bmedia\s*desk\b',
 ]
 
-def has_media_tag(subject: str, body: str) -> bool:
-    full_text = f"{subject}\n{body}"
-    for pat in MEDIA_TAG_PATTERNS:
-        if re.search(pat, full_text, re.IGNORECASE):
+def has_media_subject(subject: str) -> bool:
+    if not subject:
+        return False
+    for pat in MEDIA_SUBJECT_PATTERNS:
+        if re.search(pat, subject, re.IGNORECASE):
             return True
     return False
 
@@ -133,18 +152,41 @@ class ExtractionProvider:
             if re.search(pat, full_text, re.IGNORECASE):
                 return AnalysisResult(classification='irrelevant', events=[])
 
+        is_media_subject = has_media_subject(subject)
+
+        # Discard generic university circulars, academic notices, and non-media alerts unless explicit media request in subject
+        if not is_media_subject:
+            for pat in NON_MEDIA_SUBJECT_PATTERNS:
+                if re.search(pat, subject, re.IGNORECASE):
+                    return AnalysisResult(classification='irrelevant', events=[])
+
         sections = parse_template_sections(body)
         if not sections:
             sections = parse_template_sections(full_text)
 
-        has_tag = has_media_tag(subject, body)
-        has_gear = any(k in sections for k in ('audio', 'video', 'other_gear'))
-        has_venue = 'venue' in sections
-        has_title = 'title' in sections
+        # Parse gear requirements
+        reqs: list[Requirement] = []
+        if 'audio' in sections:
+            reqs.extend(parse_gear_items(sections['audio'], 'audio'))
+        if 'video' in sections:
+            reqs.extend(parse_gear_items(sections['video'], 'video'))
+        if 'other_gear' in sections:
+            reqs.extend(parse_gear_items(sections['other_gear'], 'other'))
 
-        # If it doesn't have an explicit media tag and doesn't have structured gear requirements, it's NOT a media request
-        if not has_tag and not (has_gear and (has_venue or has_title)):
-            return AnalysisResult(classification='irrelevant', events=[])
+        venue = sections.get('venue') or ''
+        date_parts = parse_date_str(sections.get('date', ''))
+        start_parts = parse_time_str(sections.get('start_time', ''))
+        setup_parts = parse_time_str(sections.get('setup_deadline', ''))
+
+        # STRICT MEDIA CRITERIA:
+        # 1. If subject explicitly has [MEDIA REQUEST], accept it (staff will review if gear is missing)
+        # 2. If subject does NOT have [MEDIA REQUEST], it MUST have parsed gear requirements (reqs > 0)
+        # Emails without [MEDIA REQUEST] and without gear requirements are 100% IRRELEVANT.
+        if not is_media_subject:
+            if len(reqs) == 0:
+                return AnalysisResult(classification='irrelevant', events=[])
+            if not venue and not date_parts:
+                return AnalysisResult(classification='irrelevant', events=[])
 
         # It is confirmed as a media request email
         title = sections.get('title') or subject or 'Untitled Media Request'
@@ -155,22 +197,10 @@ class ExtractionProvider:
         contact = sections.get('contact') or ''
         notes = sections.get('notes') or ''
 
-        reqs: list[Requirement] = []
-        if 'audio' in sections:
-            reqs.extend(parse_gear_items(sections['audio'], 'audio'))
-        if 'video' in sections:
-            reqs.extend(parse_gear_items(sections['video'], 'video'))
-        if 'other_gear' in sections:
-            reqs.extend(parse_gear_items(sections['other_gear'], 'other'))
-
         tz = ZoneInfo(self.tz_name)
         event_start = None
         setup_deadline = None
         review_reasons = []
-
-        date_parts = parse_date_str(sections.get('date', ''))
-        start_parts = parse_time_str(sections.get('start_time', ''))
-        setup_parts = parse_time_str(sections.get('setup_deadline', ''))
 
         if date_parts:
             y, m, d = date_parts

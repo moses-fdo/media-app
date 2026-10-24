@@ -29,6 +29,28 @@ def create_app(settings=None):
                                 run_in_process_sync(app.state.settings, box.id, 30)
                     except Exception:
                         pass
+            # Auto-purge non-media circulars that were accidentally ingested
+            try:
+                import re
+                from sqlalchemy import select, delete
+                from .models import RequestRecord, Reminder
+                with app.state.db() as session:
+                    to_delete = []
+                    for req in session.scalars(select(RequestRecord)).all():
+                        d = req.data or {}
+                        title = d.get('title', '')
+                        reqs = d.get('requirements', [])
+                        is_explicit = bool(re.search(r'\[media\s*request\]|\[media\]', title, re.IGNORECASE))
+                        is_circular = bool(re.search(r'\bcircular\b|\budemy\b|\bfellowship\b|\bhackathon\b|\bawareness\s*pledge\b|\bstudent\s*representatives\b|\belection\b|\bchatgpt\b|\bquantumania\b', title, re.IGNORECASE))
+                        if is_circular or (len(reqs) == 0 and not is_explicit):
+                            to_delete.append(req.id)
+                    if to_delete:
+                        session.execute(delete(Reminder).where(Reminder.request_id.in_(to_delete)))
+                        session.execute(delete(RequestRecord).where(RequestRecord.id.in_(to_delete)))
+                        session.commit()
+            except Exception:
+                pass
+
             task = asyncio.create_task(sync_loop())
         yield
         if task:

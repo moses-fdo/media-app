@@ -33,25 +33,60 @@ export const api=new ApiClient(base,async v=>{await store.set(v);if(!v){queryCli
 const Context=createContext<{ready:boolean;tokens:Tokens|null;me:Me|null;authError:string|null;login:(demo?:boolean)=>Promise<void>;logout:()=>Promise<void>;connectMailbox:()=>Promise<void>}>({ready:false,tokens:null,me:null,authError:null,login:async()=>{},logout:async()=>{},connectMailbox:async()=>{}});
 WebBrowser.maybeCompleteAuthSession();
 
+export async function saveOAuthVerifier(verifier: string, intent: string = 'auth') {
+  if (Platform.OS === 'web') {
+    try {
+      sessionStorage.setItem('oauth_verifier', verifier);
+      localStorage.setItem('oauth_verifier', verifier);
+      sessionStorage.setItem('oauth_intent', intent);
+      localStorage.setItem('oauth_intent', intent);
+    } catch {}
+  } else {
+    await SecureStore.setItemAsync('oauth_verifier', verifier);
+    await SecureStore.setItemAsync('oauth_intent', intent);
+  }
+}
+
+export async function getOAuthVerifier(): Promise<{ verifier: string | null; intent: string | null }> {
+  if (Platform.OS === 'web') {
+    try {
+      return {
+        verifier: sessionStorage.getItem('oauth_verifier') || localStorage.getItem('oauth_verifier'),
+        intent: sessionStorage.getItem('oauth_intent') || localStorage.getItem('oauth_intent'),
+      };
+    } catch {
+      return { verifier: null, intent: null };
+    }
+  }
+  const verifier = await SecureStore.getItemAsync('oauth_verifier');
+  const intent = await SecureStore.getItemAsync('oauth_intent');
+  return { verifier, intent };
+}
+
+export async function clearOAuthVerifier() {
+  if (Platform.OS === 'web') {
+    try {
+      sessionStorage.removeItem('oauth_verifier');
+      localStorage.removeItem('oauth_verifier');
+      sessionStorage.removeItem('oauth_intent');
+      localStorage.removeItem('oauth_intent');
+    } catch {}
+  } else {
+    await SecureStore.deleteItemAsync('oauth_verifier').catch(() => {});
+    await SecureStore.deleteItemAsync('oauth_intent').catch(() => {});
+  }
+}
+
 async function googleFlow(path:string){
   const isWeb=Platform.OS==='web';
   const redirect=isWeb?(window.location.origin+window.location.pathname):'mediaops://auth';
   const random=await Crypto.getRandomBytesAsync(48);
   const verifier=Array.from(random,b=>b.toString(16).padStart(2,'0')).join('');
   const challenge=(await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256,verifier,{encoding:Crypto.CryptoEncoding.BASE64})).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const intent = path.includes('mailbox') ? 'mailbox' : 'auth';
+  await saveOAuthVerifier(verifier, intent);
 
   if(isWeb){
-    try{
-      sessionStorage.setItem('oauth_verifier',verifier);
-      localStorage.setItem('oauth_verifier',verifier);
-      if(path.includes('mailbox')){
-        sessionStorage.setItem('oauth_intent','mailbox');
-        localStorage.setItem('oauth_intent','mailbox');
-      }else{
-        sessionStorage.removeItem('oauth_intent');
-        localStorage.removeItem('oauth_intent');
-      }
-    }catch{}
     const {url}=await api.post<{url:string}>(path,{challenge,redirect_uri:redirect});
     window.location.assign(url);
     return new Promise(()=>{});
@@ -59,11 +94,18 @@ async function googleFlow(path:string){
 
   // Native flow (Android / iOS)
   const {url}=await api.post<{url:string}>(path,{challenge,redirect_uri:redirect});
-  const result=await WebBrowser.openAuthSessionAsync(url,redirect);
-  if(result.type!=='success')throw new Error('Sign-in was cancelled. You can try again.');
-  const code=new URL(result.url).searchParams.get('code');
-  if(!code)throw new Error('Sign-in code was missing. Try again.');
-  await api.setSession(await api.post<Tokens>('/auth/exchange',{code,verifier}));
+  try {
+    const result=await WebBrowser.openAuthSessionAsync(url,redirect);
+    if(result.type==='success'){
+      const code=new URL(result.url).searchParams.get('code');
+      if(code){
+        await api.setSession(await api.post<Tokens>('/auth/exchange',{code,verifier}));
+        await clearOAuthVerifier();
+      }
+    }
+  } catch {
+    // If openAuthSessionAsync is interrupted by deep link intent, /auth screen handles exchange
+  }
 }
 
 export function AuthProvider({children}:{children:React.ReactNode}){

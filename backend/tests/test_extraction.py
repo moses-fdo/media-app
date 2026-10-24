@@ -184,3 +184,25 @@ def test_extraction_provider_spam_classified_irrelevant():
     assert res.classification == 'irrelevant'
     assert len(res.events) == 0
 
+def test_extraction_provider_user_screenshot_circulars_all_irrelevant():
+    from app.extraction.provider import ExtractionProvider
+    from app.models import Message
+    provider = ExtractionProvider()
+
+    examples = [
+        ("Workshop on ChatGPT Astra-6 | 22 October 2026", "Event: Workshop on ChatGPT\nDate: 22.10.2026\nVenue: Hall B\nJoin the workshop."),
+        ("CIRCULAR: Call for Applications – IndiaAI Fellowship Programme for AY 2026–27 - reg", "Please see attached circular regarding fellowships."),
+        ("CIRCULAR: National Innovation Challenges & Hackathons - Call for Student Registrations - reg", "Hackathon circular details."),
+        ("Update on Udemy Course Access", "Your access to Udemy courses has been updated."),
+        ("CIRCULAR: Cyber Security Awareness Pledge - reg", "All students take pledge."),
+        ("Combined Morning Assembly on 14.10.2026", "Assembly will be held at 8:30 AM at Main Auditorium."),
+        ("Student Representatives-AY 2026–2027", "List of student representatives."),
+        ("QUANTUMANIA 2.0 – Workshop on Mathematical Foundations and Basics of Quantum Computing", "Quantum workshop details at campus.")
+    ]
+
+    for subject, body in examples:
+        msg = Message(subject=subject, body=body, sender="admin@karunya.edu.in")
+        res = provider.analyze(msg)
+        assert res.classification == 'irrelevant', f"Expected '{subject}' to be irrelevant but got {res.classification}"
+        assert len(res.events) == 0
+
