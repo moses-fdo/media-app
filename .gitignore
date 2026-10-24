@@ -8,6 +8,8 @@ build/
 web-build/
 .expo/
 mobile/.expo/
+*.apk
+*.aab
 
 # Native builds
 mobile/android/
