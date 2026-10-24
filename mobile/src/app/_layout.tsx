@@ -19,10 +19,10 @@ function makeHeaderLeft(c:any,fallback:string,label:string){
 }
 
 function Routes(){
-  const {colors:c}=useTheme();
+  const {colors:c,isDark}=useTheme();
   return (
     <>
-      <StatusBar style={c.bg==='#16191E'?'light':'dark'}/>
+      <StatusBar style={isDark?'light':'dark'}/>
       <Stack screenOptions={{headerStyle:{backgroundColor:c.bg},headerTintColor:c.blue,headerShadowVisible:false,contentStyle:{backgroundColor:c.bg},headerBackTitle:'Back'}}>
         <Stack.Screen name="(tabs)" options={{headerShown:false}}/>
         <Stack.Screen name="sign-in" options={{headerShown:false}}/>
