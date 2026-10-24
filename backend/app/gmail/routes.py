@@ -1,9 +1,10 @@
-from fastapi import APIRouter,Depends,Request,HTTPException,Query
+from fastapi import APIRouter,Depends,Request,HTTPException,Query,BackgroundTasks
 from sqlalchemy import select,func,delete
 from cryptography.fernet import Fernet
 import httpx
 from ..auth.sessions import require_member,require_admin,get_session
 from ..models import Mailbox,Message
+from .sync import run_in_process_sync
 router=APIRouter(prefix='/api/v1')
 def mailbox(db,workspace):return db.scalar(select(Mailbox).where(Mailbox.workspace_id==workspace))
 @router.get('/mailbox/status')
@@ -12,22 +13,27 @@ def status(request:Request,member=Depends(require_member),db=Depends(get_session
     if not b:return {'status':'disconnected','email':None,'last_synced':None,'demo':request.app.state.settings.demo_enabled}
     return {'status':b.status,'email':b.email,'last_synced':b.last_synced,'error':b.error,'queued':db.scalar(select(func.count()).select_from(Message).where(Message.mailbox_id==b.id,Message.status=='queued')),'failed':db.scalar(select(func.count()).select_from(Message).where(Message.mailbox_id==b.id,Message.status=='failed')),'demo':request.app.state.settings.demo_enabled}
 @router.post('/mailbox/sync',status_code=202)
-def sync(request:Request,member=Depends(require_member),db=Depends(get_session)):
+def sync(background_tasks:BackgroundTasks,request:Request,member=Depends(require_member),db=Depends(get_session)):
     b=mailbox(db,member.workspace_id)
     if not b:raise HTTPException(409,'Connect Gmail first')
     if request.app.state.settings.demo_enabled:raise HTTPException(409,'Demo mode does not connect to Gmail')
     try:
         from ..jobs.tasks import sync_one
         sync_one.delay(b.id)
-    except Exception:raise HTTPException(503,'Background worker unavailable. Try again later.')
+    except Exception:
+        background_tasks.add_task(run_in_process_sync,request.app.state.settings,b.id,30)
     return {'status':'queued'}
 @router.post('/mailbox/backfill',status_code=202)
-def backfill(days:int=Query(90,ge=1,le=365),member=Depends(require_admin),db=Depends(get_session)):
+def backfill(background_tasks:BackgroundTasks,request:Request,days:int=Query(90,ge=1,le=365),member=Depends(require_admin),db=Depends(get_session)):
     b=mailbox(db,member.workspace_id)
     if not b:raise HTTPException(409,'Connect Gmail first')
     b.history_id=None;db.commit()
-    from ..jobs.tasks import sync_one
-    sync_one.delay(b.id,days);return {'status':'queued'}
+    try:
+        from ..jobs.tasks import sync_one
+        sync_one.delay(b.id,days)
+    except Exception:
+        background_tasks.add_task(run_in_process_sync,request.app.state.settings,b.id,days)
+    return {'status':'queued'}
 @router.post('/mailbox/disconnect')
 def disconnect(request:Request,member=Depends(require_admin),db=Depends(get_session)):
     b=mailbox(db,member.workspace_id)

@@ -6,9 +6,35 @@ from .config import Settings
 from .database import database, Base
 from . import models
 
+from contextlib import asynccontextmanager
+
 def create_app(settings=None):
     settings=settings or Settings()
-    app=FastAPI(title='Karunya Media Desk API', version='0.1.0')
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        task = None
+        if settings.environment != 'test':
+            import asyncio
+            async def sync_loop():
+                while True:
+                    await asyncio.sleep(120)
+                    try:
+                        from .models import Mailbox
+                        from .gmail.sync import run_in_process_sync
+                        from sqlalchemy import select
+                        with app.state.db() as session:
+                            boxes = session.scalars(select(Mailbox).where(Mailbox.status != 'reconnect_required')).all()
+                            for box in boxes:
+                                run_in_process_sync(app.state.settings, box.id, 30)
+                    except Exception:
+                        pass
+            task = asyncio.create_task(sync_loop())
+        yield
+        if task:
+            task.cancel()
+
+    app=FastAPI(title='Karunya Media Desk API', version='0.1.0', lifespan=lifespan)
     app.state.settings=settings
     app.state.engine, app.state.db=database(settings.database_url)
     Base.metadata.create_all(app.state.engine)

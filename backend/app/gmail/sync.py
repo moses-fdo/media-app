@@ -26,3 +26,67 @@ def sync_mailbox(db,box,client,days=30):
         token=page.get('nextPageToken')
         if not token:
             box.history_id=checkpoint if initial else page.get('historyId',checkpoint);box.last_synced=now();box.status='connected';db.commit();break
+
+def run_in_process_sync(settings, mailbox_id: str, days: int = 30):
+    import base64
+    from ..database import database
+    from ..models import Mailbox
+    from ..extraction.provider import ExtractionProvider
+    from ..extraction.attachments import extract_attachment
+    from ..extraction.service import process_message
+    from .client import GmailClient, ReconnectRequired
+
+    engine, sessions = database(settings.database_url)
+    try:
+        with sessions() as db:
+            box = db.get(Mailbox, mailbox_id)
+            if not box:
+                return
+            try:
+                client = GmailClient(settings, box)
+                sync_mailbox(db, box, client, days)
+                
+                provider = ExtractionProvider(settings)
+                queued = db.scalars(
+                    select(Message).where(Message.mailbox_id == mailbox_id, Message.status.in_(['queued', 'failed'])).limit(100)
+                ).all()
+                for m in queued:
+                    try:
+                        attachments = []
+                        g_client = None
+                        for a in (m.attachments or []):
+                            if a.get('status') == 'pending':
+                                if a.get('size', 0) > 10 * 1024 * 1024:
+                                    a = {**a, 'status': 'manual_review', 'reason': 'Attachment exceeds 10 MB'}
+                                else:
+                                    if a.get('inline_data'):
+                                        data = base64.urlsafe_b64decode(a['inline_data'] + '=' * (-len(a['inline_data']) % 4))
+                                    elif a.get('provider_id'):
+                                        g_client = g_client or GmailClient(settings, box)
+                                        data = g_client.get_attachment(m.provider_id, a['provider_id'])
+                                    else:
+                                        data = b''
+                                    a = {**a, **extract_attachment(data, a.get('mime_type', 'application/octet-stream'))}
+                            attachments.append({k: v for k, v in a.items() if k != 'inline_data'})
+                        m.attachments = attachments
+                        process_message(db, m, provider)
+                    except Exception as err:
+                        db.rollback()
+                        m = db.get(Message, m.id)
+                        if m:
+                            m.status = 'failed'
+                            m.error = f'Analysis failed: {err}'
+                            db.commit()
+            except ReconnectRequired:
+                box.status = 'reconnect_required'
+                box.error = 'Reconnect Gmail to resume synchronization'
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                box = db.get(Mailbox, mailbox_id)
+                if box:
+                    box.status = 'error'
+                    box.error = f'Synchronization failed: {e}'
+                    db.commit()
+    finally:
+        engine.dispose()
