@@ -11,8 +11,7 @@ def create_app(settings=None):
     app=FastAPI(title='Karunya Media Desk API', version='0.1.0')
     app.state.settings=settings
     app.state.engine, app.state.db=database(settings.database_url)
-    if settings.environment in ('test','development'):
-        Base.metadata.create_all(app.state.engine)
+    Base.metadata.create_all(app.state.engine)
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(','), allow_methods=['*'], allow_headers=['Authorization','Content-Type'])
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):

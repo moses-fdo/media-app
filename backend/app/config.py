@@ -22,6 +22,6 @@ class Settings(BaseSettings):
         if self.environment == 'production':
             if self.demo_enabled or not self.encryption_key or not self.admin_email:
                 raise ValueError('Production requires encryption/admin configuration and forbids demo mode')
-            if not self.database_url.startswith('postgresql') or (not self.google_redirect_uri.startswith('https://') and not self.google_redirect_uri.startswith('http://localhost') and not self.google_redirect_uri.startswith('http://127.0.0.1')):
+            if not (self.database_url.startswith('postgresql') or self.database_url.startswith('postgres')) or (not self.google_redirect_uri.startswith('https://') and not self.google_redirect_uri.startswith('http://localhost') and not self.google_redirect_uri.startswith('http://127.0.0.1')):
                 raise ValueError('Production requires PostgreSQL and HTTPS (or localhost) OAuth redirect')
         return self
