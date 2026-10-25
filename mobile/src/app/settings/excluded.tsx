@@ -23,7 +23,7 @@ export default function ExcludedSettings() {
   const query = useQuery({
     queryKey: ['excluded'],
     queryFn: () => api.get<{ items: ExcludedMessage[] }>('/mailbox/excluded'),
-    enabled: me?.role === 'admin',
+    enabled: !!me,
   });
 
   async function handleReprocess(item: ExcludedMessage) {
@@ -44,19 +44,10 @@ export default function ExcludedSettings() {
     }
   }
 
-  if (me?.role !== 'admin') {
-    return (
-      <View style={{ padding: 22, gap: 16 }}>
-        <Label size={20} bold>Access Denied</Label>
-        <Label muted>Only administrators can inspect excluded email headers.</Label>
-        <Button title="Back" quiet onPress={() => router.canGoBack() ? router.back() : router.replace('/settings')} />
-      </View>
-    );
-  }
 
   return (
     <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
-      <Label size={26} bold>Excluded Email Recovery</Label>
+      <Label size={26} bold>Excluded emails</Label>
       <Label muted size={14}>
         Emails classified as irrelevant or general announcements are not shown on the Requests screen. If an email contained a valid media request, you can reprocess it here.
       </Label>

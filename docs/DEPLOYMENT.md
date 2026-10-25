@@ -59,3 +59,15 @@ ADMIN_EMAIL=<the existing workspace administrator email>
 Keep the existing administrator email rather than changing workspace ownership. The configured administrator must be active with role `admin` and must sign in first if the workspace has not yet been initialized. New domain members receive only the `staff` role in that administrator's workspace. Existing memberships are retained; inactive members stay blocked. Other domains, subdomains and unverified accounts are rejected. Administrators still manage members and connect/reconnect the shared Gmail mailbox. No APK rebuild or database migration is required.
 
 The flag defaults to false, retaining invitation-only access unless explicitly enabled. On the hosted service, save these environment settings and deploy this source revision. Code changes alone do not change the running server. This repository does not identify students versus employees within a shared email domain: enabling domain registration admits every verified account on that domain.
+
+## Personal Gmail accounts — current app flow
+
+Set `PERSONAL_ACCOUNTS=true` on the API, worker and scheduler (this is now the default outside tests). Each verified Google identity gets its own private workspace and Gmail connection through the initial read-only consent. The earlier shared-registration configuration above is superseded in this mode; its settings are ignored.
+
+The image now runs `alembic upgrade head` before starting the API. An overridden start command must also run this migration. Revision 003 adds a unique Google identity owner to workspaces. API readiness requires revision 003.
+
+Existing users sign in again. They receive a private workspace and import their own inbox afresh; old shared records remain preserved in their original workspace. Old shared sessions, notification registrations, reminders and OAuth handoffs are retired when the account transitions. Private-mode API checks also reject old shared access before that transition. Workers skip mailboxes without verified private ownership. No prior shared records or Gmail tokens are copied into a personal account.
+
+Use the updated mobile app for the personal interface. New personal accounts open Requests directly; the existing automatic mailbox sync imports their own mail. Gmail connection, optional reminders and widget preferences remain available from Settings. Google consent is still required. Redis, a running worker/scheduler and the hosted HTTPS API remain required for deployed background synchronization.
+
+Verification: 123 backend tests passed (one optional external-service integration skipped), 78 mobile tests passed, TypeScript passed. A migration regression covers upgrading an existing 002 database without deleting earlier workspaces. Google OAuth protocol reference: https://developers.google.com/identity/protocols/oauth2/web-server. Live Google consent and phone integration require actual account/device validation.

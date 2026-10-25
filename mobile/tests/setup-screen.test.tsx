@@ -35,14 +35,13 @@ beforeEach(async () => {
   mockPost.mockResolvedValue({ status: 'queued' }); mockPut.mockResolvedValue({ ok: true }); mockConnect.mockResolvedValue(undefined); mockPush.mockResolvedValue('fixture-push');
 });
 
-test('staff use the shared mailbox and are not offered administrator-only connection', async () => {
-  mockMe.role = 'staff'; mockMailbox = { status: 'disconnected', email: null, last_synced: null };
+test('a personal account can connect Gmail without a separate account role', async () => {
+  mockMe.role = 'user'; mockMailbox = { status: 'disconnected', email: null, last_synced: null };
   await show('mailbox');
-  await screen.findByText(/Your administrator connects/);
-  expect(screen.queryByRole('button', { name: 'Connect department Gmail' })).toBeNull();
-  await fireEvent.press(screen.getByRole('button', { name: 'Set up Gmail later' }));
-  await screen.findByText('A little notice goes a long way.');
-  expect(mockConnect).not.toHaveBeenCalled(); expect(mockPost).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Connect Gmail' })).toBeTruthy();
+  expect(screen.queryByText(/administrator|department|shared mailbox/i)).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Connect Gmail' }));
+  expect(mockConnect).toHaveBeenCalledTimes(1);
 });
 
 test('first sync waits for a new timestamp and extraction rather than treating queued as success', async () => {

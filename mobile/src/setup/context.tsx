@@ -22,7 +22,7 @@ export function SetupProvider({ children }: { children: React.ReactNode }) {
     current.current = null; setLoaded(null); setError(null);
     if (key) AsyncStorage.getItem(key).then(raw => {
       if (!active) return;
-      const next = { key, state: parseSetup(raw) };
+      const next = { key, state: !raw && me?.account_mode === 'personal' ? { ...defaultSetup, completed: true } : parseSetup(raw) };
       current.current = next; setLoaded(next);
     }).catch(() => {
       if (!active) return;
@@ -30,7 +30,7 @@ export function SetupProvider({ children }: { children: React.ReactNode }) {
       current.current = next; setLoaded(next); setError(new Error('Unable to read saved setup. You can continue for now.'));
     });
     return () => { active = false; current.current = null; };
-  }, [key]);
+  }, [key, me?.account_mode]);
 
   const update = useCallback((changes: Partial<SetupState>) => {
     const task = writes.current.catch(() => {}).then(async () => {

@@ -67,7 +67,7 @@ function renderWithClient(ui: React.ReactElement) {
   );
 }
 
-test('renders user profile, mailbox status, and admin controls for admin', async () => {
+test('shows only personal account settings', async () => {
   mockMe = {
     id: 'u1',
     name: 'Alex Rivera',
@@ -82,13 +82,14 @@ test('renders user profile, mailbox status, and admin controls for admin', async
   await renderWithClient(<Settings />);
 
   expect(screen.getByText('Alex Rivera')).toBeTruthy();
-  expect(screen.getByText(/Media Ops · Administrator/)).toBeTruthy();
+  expect(screen.queryByText(/Administrator|Staff|Media Ops/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Staff' })).toBeNull();
   expect(screen.getByText('alex@example.edu')).toBeTruthy();
-  expect(screen.getByText('Excluded Email Recovery')).toBeTruthy();
-  expect(screen.getByText('Delete Stored Workspace Data')).toBeTruthy();
+  expect(screen.getByText('Excluded emails')).toBeTruthy();
+  expect(screen.getByText('Delete imported data')).toBeTruthy();
 });
 
-test('hides admin controls for standard staff member', async () => {
+test('personal Gmail controls do not depend on a legacy role', async () => {
   mockMe = {
     id: 'u2',
     name: 'Jordan Lee',
@@ -103,9 +104,9 @@ test('hides admin controls for standard staff member', async () => {
   await renderWithClient(<Settings />);
 
   expect(screen.getByText('Jordan Lee')).toBeTruthy();
-  expect(screen.getByText(/Media Ops · Staff/)).toBeTruthy();
-  expect(screen.queryByText('Excluded Email Recovery')).toBeNull();
-  expect(screen.queryByText('Delete Stored Workspace Data')).toBeNull();
+  expect(screen.queryByText(/Media Ops · Staff/)).toBeNull();
+  expect(screen.getByText('Excluded emails')).toBeTruthy();
+  expect(screen.getByText('Delete imported data')).toBeTruthy();
 });
 
 test('triggers logout on sign out tap', async () => {

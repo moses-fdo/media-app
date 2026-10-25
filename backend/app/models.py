@@ -10,6 +10,7 @@ class Workspace(Base):
     __tablename__='workspaces'
     id: Mapped[str]=mapped_column(String, primary_key=True, default=uid)
     name: Mapped[str]=mapped_column(default='Media department')
+    owner_subject: Mapped[str|None]=mapped_column(String, nullable=True, unique=True)
     timezone: Mapped[str]=mapped_column(default='Asia/Kolkata')
 class Member(Base):
     __tablename__='members'

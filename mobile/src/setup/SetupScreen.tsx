@@ -28,7 +28,6 @@ export default function SetupScreen() {
   const [selected, setSelected] = useState<number[]>(me?.preferences?.offsets || [1440, 60]);
   const step = state.step;
   const index = setupSteps.indexOf(step);
-  const isAdmin = me?.role === 'admin';
   const mailbox = useQuery({ queryKey: [me?.workspace_id, 'setup-mailbox'], queryFn: () => api.get<Mailbox>('/mailbox/status'), enabled: !!me && ['mailbox', 'sync'].includes(step), refetchInterval: ['mailbox', 'sync'].includes(step) ? 2000 : false });
   const progress = syncProgress(mailbox.data, state);
   const connected = mailboxConnected(mailbox.data);
@@ -69,15 +68,15 @@ export default function SetupScreen() {
 
   const headings = {
     welcome: `Welcome${me?.name ? ', ' + me.name.split(' ')[0] : ''}.`,
-    mailbox: 'One inbox. A shared view.',
+    mailbox: 'Your Gmail. Your events.',
     sync: 'Bring your requests together.',
     reminders: 'A little notice goes a long way.',
     widget: 'Keep your next events close.',
   };
   const descriptions = {
-    welcome: 'Connect your department inbox, bring in media requests, and choose how you stay ahead of each event.',
-    mailbox: isAdmin ? 'Connect the Gmail account that receives your department’s media requests. Your staff sign-in stays separate.' : 'Your administrator connects the shared department mailbox. You can use its requests without connecting your own inbox.',
-    sync: 'We’ll read incoming mail and organize media requests into your workspace. Gmail messages stay in your inbox.',
+    welcome: 'Bring event requests from your Gmail into one clear schedule.',
+    mailbox: 'Use the same Google account you signed in with. Only your own Gmail is connected.',
+    sync: 'We’ll read incoming mail and organize media requests into your event list. Gmail messages stay in your inbox.',
     reminders: 'Choose when you want a reminder before a confirmed setup deadline. Phone notifications are optional.',
     widget: 'See the next three events on your Android home screen. Tap an event to open its request.',
   };
@@ -104,7 +103,7 @@ export default function SetupScreen() {
 
         {step === 'welcome' && <View>
           {[
-            [Mail, 'Connect once for the team', 'A shared mailbox keeps everyone working from the same requests.'],
+            [Mail, 'Read your Gmail', 'Event requests from your inbox appear here, visible only to you.'],
             [CalendarDays, 'Find the event details', 'Dates, venues and equipment stay together in Requests and Agenda.'],
             [Bell, 'Stay ahead of setup', 'Optional reminders and a home-screen widget keep upcoming events in view.'],
           ].map(([Icon, title, body]) => { const Symbol = Icon as typeof Mail; return <View key={String(title)} style={{ flexDirection: 'row', gap: 14, paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.line }}><Symbol size={22} color={c.blue} /><View style={{ flex: 1, gap: 4 }}><Label size={16} bold>{String(title)}</Label><Label size={14} muted>{String(body)}</Label></View></View>; })}
@@ -112,9 +111,9 @@ export default function SetupScreen() {
 
         {['mailbox', 'sync'].includes(step) && <>
           {mailbox.isLoading ? <ActivityIndicator color={c.blue} /> : <View style={{ paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.line, gap: 6 }}>
-            <Label size={13} muted>Department mailbox</Label>
-            <Label size={17} bold>{mailbox.data?.email || 'No mailbox connected'}</Label>
-            <Label size={14} style={{ color: mailbox.data?.status === 'error' || !connected ? c.amber : mailbox.data?.status === 'syncing' ? c.blue : c.green }}>{mailbox.data?.status === 'error' ? 'Sync needs attention' : mailbox.data?.status === 'syncing' ? 'Sync in progress' : connected ? 'Connected to your workspace' : 'Connection needed'}</Label>
+            <Label size={13} muted>Your Gmail account</Label>
+            <Label size={17} bold>{mailbox.data?.email || 'Gmail is not connected'}</Label>
+            <Label size={14} style={{ color: mailbox.data?.status === 'error' || !connected ? c.amber : mailbox.data?.status === 'syncing' ? c.blue : c.green }}>{mailbox.data?.status === 'error' ? 'Sync needs attention' : mailbox.data?.status === 'syncing' ? 'Sync in progress' : connected ? 'Connected' : 'Connection needed'}</Label>
           </View>}
           <ErrorNote error={mailbox.error} />
           {mailbox.error && <Button title="Check connection" quiet disabled={busy} onPress={() => perform(() => mailbox.refetch({ throwOnError: true }))} />}
@@ -122,9 +121,7 @@ export default function SetupScreen() {
 
         {step === 'mailbox' && <>
           <Label size={14} muted>Gmail access is read-only. Media Desk reads request emails; it does not send or delete mail.</Label>
-          {!isAdmin && !connected && <Label size={14}>Ask your administrator to connect the department mailbox. You can continue setting up reminders now.</Label>}
-          {!connected && isAdmin && <Button title="Connect department Gmail" busy={busy} disabled={mailbox.isLoading || !!mailbox.error} onPress={() => perform(connect)} />}
-          {!connected && !isAdmin && !mailbox.error && <Button title="Check connection" quiet busy={busy} onPress={() => perform(() => mailbox.refetch({ throwOnError: true }))} />}
+          {!connected && <Button title="Connect Gmail" busy={busy} disabled={mailbox.isLoading || !!mailbox.error} onPress={() => perform(connect)} />}
           {connected && <Button title="Continue to first sync" busy={busy} onPress={() => go('sync')} />}
           <Button title="Set up Gmail later" quiet disabled={busy} onPress={() => go('reminders')} />
         </>}
@@ -136,12 +133,12 @@ export default function SetupScreen() {
               {active ? <ActivityIndicator color={c.blue} /> : progress === 'complete' ? <CheckCircle2 size={24} color={c.green} /> : <RefreshCw size={22} color={c.muted} />}
               <Label size={20} bold style={{ flex: 1 }}>{progressTitles[progress]}</Label>
             </View>
-            <Label size={14} muted>{progress === 'waiting' ? 'Your sync is queued. This screen will update when the worker starts.' : progress === 'reading' ? 'Checking incoming mail for media requests. This can take a little time.' : progress === 'processing' ? 'Mail has arrived. We’re turning the remaining messages into requests.' : progress === 'complete' ? (requests.data ? `${requests.data.counts.active || 0} active ${(requests.data.counts.active || 0) === 1 ? 'request is' : 'requests are'} available. New requests will appear as mail arrives.` : 'Your mailbox and request processing are up to date.') : progress === 'attention' ? `${mailbox.data?.failed || 0} messages could not be processed. You can retry sync now or review this later in Mailbox settings.` : progress === 'synced' ? 'Gmail has synced. Request processing may still be finishing in the background.' : progress === 'existing' ? 'You can use the existing shared sync, or check for newer mail now.' : progress === 'reconnect' ? 'Your administrator needs to renew Gmail access before syncing.' : progress === 'error' ? 'The last sync did not finish. Retry, or check the Gmail connection.' : 'Start a sync to bring incoming media requests into this workspace.'}</Label>
+            <Label size={14} muted>{progress === 'waiting' ? 'Your sync is queued. This screen will update when the worker starts.' : progress === 'reading' ? 'Checking incoming mail for media requests. This can take a little time.' : progress === 'processing' ? 'Mail has arrived. We’re turning the remaining messages into requests.' : progress === 'complete' ? (requests.data ? `${requests.data.counts.active || 0} active ${(requests.data.counts.active || 0) === 1 ? 'request is' : 'requests are'} available. New requests will appear as mail arrives.` : 'Your mailbox and request processing are up to date.') : progress === 'attention' ? `${mailbox.data?.failed || 0} messages could not be processed. You can retry sync now or review this later in Mailbox settings.` : progress === 'synced' ? 'Gmail has synced. Request processing may still be finishing in the background.' : progress === 'existing' ? 'Your inbox has synced before. Check for newer mail whenever you need.' : progress === 'reconnect' ? 'Reconnect your Google account to resume syncing.' : progress === 'error' ? 'The last sync did not finish. Retry, or check the Gmail connection.' : 'Start a sync to bring incoming media requests into your event list.'}</Label>
             {takingLong && active && <Label size={14} style={{ color: c.amber }}>This is taking longer than usual. You can retry or continue setup later; queued work can finish in the background.</Label>}
           </View>
           {connected && (!active || takingLong) && progress !== 'complete' && <Button title={error || state.syncRequested || ['error', 'attention'].includes(progress) ? 'Retry sync' : 'Start first sync'} busy={busy} disabled={mailbox.isLoading || !!mailbox.error} onPress={() => perform(startSync)} />}
           {active && <Button title="Check progress" quiet disabled={busy || mailbox.isFetching} onPress={() => perform(() => mailbox.refetch({ throwOnError: true }))} />}
-          {!connected && <Button title={isAdmin ? 'Connect Gmail' : 'Check shared connection'} quiet onPress={() => go('mailbox')} />}
+          {!connected && <Button title="Connect Gmail" quiet onPress={() => go('mailbox')} />}
           {finished && <Button title="Continue to reminders" busy={busy} onPress={() => perform(async () => { await setup.update({ step: 'reminders' }); await client.invalidateQueries(); })} />}
           <Button title="Sync later" quiet disabled={busy} onPress={() => go('reminders')} />
         </>}
@@ -176,7 +173,7 @@ export default function SetupScreen() {
         {!!notice && <Label size={14} accessibilityLiveRegion="polite">{notice}</Label>}
       </View>
       <View style={{ gap: 12, paddingTop: 28 }}>
-        {step === 'welcome' && <Button title="Set up my workspace" busy={busy} onPress={() => go('mailbox')} />}
+        {step === 'welcome' && <Button title="Continue" busy={busy} onPress={() => go('mailbox')} />}
         {index > 0 && <Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={busy} onPress={() => go(setupSteps[index - 1])} style={{ minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12 }}><Label size={14} style={{ color: c.blue }}>Back</Label></Pressable>}
         <Label size={12} muted style={{ textAlign: 'center', marginTop: 8 }}>Step {index + 1} of 5 · Replay setup anytime in Settings</Label>
         <View accessibilityRole="progressbar" accessibilityLabel="Setup progress" accessibilityValue={{ min: 1, max: 5, now: index + 1 }} style={{ flexDirection: 'row', gap: 6 }}>{setupSteps.map((value, position) => <View key={value} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: position <= index ? c.blue : c.line }} />)}</View>

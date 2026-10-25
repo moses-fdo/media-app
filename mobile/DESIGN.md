@@ -51,3 +51,7 @@ Agenda shares the Requests avatar/settings header, adds an outlined Today contro
 Details uses a larger title, quiet organizer/location/date metadata, a plain Edit action and a ruled deadline row with semantic deadline text. Equipment and anchored lifecycle actions remain intact. Bottom navigation labels are slightly larger.
 
 Current documentation drift: the earlier 32px detail-title and amber-strip description above predates this refinement; the implemented title is 34px and the deadline row has a transparent background. These are local screen refinements, not new global tokens. The existing document structure and design sidecar have not been normalized or regenerated. See `../docs/ui-concepts/EDITORIAL-VALIDATION.md` for evidence and limits.
+
+## Personal account interface
+
+Keep the Editorial Desk visual language. Settings shows the signed-in profile without role badges or shared-workspace labels. Use Your Gmail, Gmail connection, Excluded emails and Delete imported data. Remove team-directory navigation and equipment assignment selectors. Sign-in explains private read-only Gmail access. First-time personal accounts open Requests directly; optional setup uses personal copy and offers Gmail recovery to the account owner.

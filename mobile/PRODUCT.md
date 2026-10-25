@@ -37,3 +37,9 @@ Use native date/time pickers, inline validation with scroll recovery, account-sc
 ## Email intake policy
 
 Only correctly structured media-request template emails create new imported events. Ordinary campus circulars, newsletters, subject tags alone and casual equipment mentions remain excluded. Review is for ambiguous values in a qualifying template and structured updates linked to an existing request. Old untouched non-template imports are reversibly excluded during sync after the backend update is deployed.
+
+## Personal Gmail flow — 25 October 2026
+
+The current app is for individuals: sign in with Google, grant read-only Gmail access, and see events imported from that account. Each Google identity owns a separate private workspace. Profile roles, shared-inbox setup, team management and equipment assignment controls are absent from the personal interface. Copy uses “Your Gmail” and “Your events”, with no hardcoded account names or email addresses.
+
+New personal accounts open Requests directly and use the existing automatic synchronization. Setup is optional and can be replayed from Settings for connection recovery, reminders and widget setup. Settings offers the user's own Gmail connection and imported-data controls. This replaces earlier shared-account product assumptions in this document.

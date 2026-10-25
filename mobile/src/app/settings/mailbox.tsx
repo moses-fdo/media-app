@@ -8,7 +8,7 @@ import { layout, useTheme } from '../../theme';
 import { Label, Button, ErrorNote } from '../../components/ui';
 
 export default function MailboxSettings() {
-  const { me, connectMailbox } = useAuth();
+  const { connectMailbox } = useAuth();
   const { colors: c } = useTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -19,7 +19,6 @@ export default function MailboxSettings() {
   });
 
   const m = query.data;
-  const isAdmin = me?.role === 'admin';
 
   async function handleSync() {
     setBusy(true);
@@ -63,8 +62,8 @@ export default function MailboxSettings() {
 
   async function handleDisconnect() {
     Alert.alert(
-      'Disconnect Gmail Mailbox',
-      'This will revoke Google OAuth access for this department mailbox. Incoming emails will no longer be synchronized. Stored requests remain intact.\n\nDo you want to proceed?',
+      'Disconnect Gmail',
+      'This will revoke Google OAuth access for your Gmail account. Incoming emails will no longer be synchronized. Stored requests remain intact.\n\nDo you want to proceed?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -90,9 +89,9 @@ export default function MailboxSettings() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
-      <Label size={26} bold>Mailbox Connection</Label>
+      <Label size={26} bold>Gmail connection</Label>
       <Label muted size={14}>
-        The media department mailbox receives requests for equipment and AV assistance. Only authorized staff can connect or manage this account.
+        Your Gmail is used to find event requests. Access is read-only; your messages are never sent or deleted.
       </Label>
 
       {query.isLoading ? (
@@ -108,7 +107,7 @@ export default function MailboxSettings() {
 
           <View style={{ height: 1, backgroundColor: c.line }} />
 
-          <Label size={14} muted>Authorized Account</Label>
+          <Label size={14} muted>Google account</Label>
           <Label bold size={15}>{m?.email || 'None connected'}</Label>
 
           <Label size={14} muted>Last Successful Sync</Label>
@@ -122,21 +121,21 @@ export default function MailboxSettings() {
         </View>
       )}
 
-      {!!m?.failed && <Label size={14} style={{ color: c.amber }}>{m.failed} messages could not be processed. Sync again to retry, or contact your administrator if the count stays unchanged.</Label>}
+      {!!m?.failed && <Label size={14} style={{ color: c.amber }}>{m.failed} messages could not be processed. Sync again to retry, or reconnect Gmail if the count stays unchanged.</Label>}
       <ErrorNote error={error} />
 
-      {isAdmin && (
+      {(
         <View style={{ gap: 12, marginTop: 10 }}>
           {!['connected','syncing','error'].includes(m?.status || '') ? (
             <Button
-              title="Connect Gmail Account"
+              title="Reconnect Gmail"
               busy={busy}
               onPress={handleConnect}
             />
           ) : (
             <>
               <Button
-                title="Sync Mailbox Now"
+                title="Sync now"
                 busy={busy}
                 onPress={handleSync}
               />
@@ -147,7 +146,7 @@ export default function MailboxSettings() {
                 onPress={handleBackfill}
               />
               <Button
-                title="Disconnect Mailbox"
+                title="Disconnect Gmail"
                 danger
                 quiet
                 busy={busy}

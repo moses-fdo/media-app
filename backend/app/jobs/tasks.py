@@ -7,6 +7,7 @@ from ..database import database
 from ..models import Mailbox,Message,Reminder
 from ..gmail.client import GmailClient,ReconnectRequired
 from ..gmail.sync import sync_mailbox
+from ..gmail.access import may_read_mailbox
 from ..extraction.provider import ExtractionProvider
 from ..extraction.attachments import extract_attachment
 from ..extraction.service import process_message
@@ -19,7 +20,9 @@ def resources():
 def sync_all():
     c,e,sessions=resources()
     with sessions() as db:
-        for box in db.scalars(select(Mailbox).where(Mailbox.status.in_(['connected','syncing','error']))):sync_one.delay(box.id)
+        for box in db.scalars(select(Mailbox).where(Mailbox.status.in_(['connected','syncing','error']))):
+            if not may_read_mailbox(c,db,box):continue
+            sync_one.delay(box.id)
     e.dispose()
 @celery.task(name='media.sync_one',bind=True,max_retries=5,soft_time_limit=840,time_limit=900)
 def sync_one(self,id,days=30,full=False,retry_failed=False):
@@ -29,6 +32,7 @@ def sync_one(self,id,days=30,full=False,retry_failed=False):
         with sessions() as db:
             box=db.get(Mailbox,id)
             if not box or not box.encrypted_token or box.status=='reconnect_required':return
+            if not may_read_mailbox(c,db,box):return
             try:
                 if full:box.history_id=None;db.commit()
                 client=GmailClient(c,box);sync_mailbox(db,box,client,days)
@@ -49,6 +53,7 @@ def extract_one(self,id):
         with sessions() as db:
             m=db.scalar(select(Message).where(Message.id==id).with_for_update())
             if not m or m.status=='processed':return
+            if not may_read_mailbox(c,db,db.get(Mailbox,m.mailbox_id)):return
             try:
                 attachments=[];client=None
                 for a in m.attachments:

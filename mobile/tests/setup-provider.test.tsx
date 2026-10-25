@@ -40,3 +40,11 @@ test('switching accounts never borrows another account completion state', async 
   await view.rerender(<SetupProvider><Probe /></SetupProvider>);
   await waitFor(() => expect(screen.getByText('welcome:true')).toBeTruthy());
 });
+
+test('new personal accounts open events directly and setup remains optional', async () => {
+  mockMe = { id: 'personal-a', workspace_id: 'private-a', account_mode: 'personal' };
+  await render(<SetupProvider><Probe /></SetupProvider>);
+  await waitFor(() => expect(screen.getByText('welcome:false')).toBeTruthy());
+  await fireEvent.press(screen.getByRole('button', { name: 'replay' }));
+  await waitFor(() => expect(screen.getByText('welcome:true')).toBeTruthy());
+});

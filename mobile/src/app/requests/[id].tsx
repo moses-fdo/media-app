@@ -19,9 +19,8 @@ import {
   AlertTriangle,
   User,
 } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
 import { api, queryClient, useAuth } from '../../auth/context';
-import { MediaRequest, Member } from '../../api/types';
+import { MediaRequest } from '../../api/types';
 import { layout, radius, useTheme } from '../../theme';
 import { Label, Button, ErrorNote, AnimatedPressable } from '../../components/ui';
 import { useCachedQuery } from '../../features/requests/useCachedQuery';
@@ -44,7 +43,6 @@ export default function Detail() {
   const [busy, setBusy] = useState(false);
 
   const r = query.data;
-  const assigned = useQuery({ queryKey: ['staff'], queryFn: () => api.get<{ items: Member[] }>('/workspace/members'), enabled: !!r?.requirements.some(item => item.assignee_id) });
 
   async function patch(data: any) {
     if (!r) return;
@@ -413,19 +411,6 @@ export default function Detail() {
         ))}
 
         <EquipmentList requirements={r.requirements} />
-
-        {r.requirements.some(item => item.assignee_id) && <View style={{ marginTop: 28, gap: 14 }}>
-          <Label size={21} bold accessibilityRole="header">Assigned staff</Label>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-            {Array.from(new Set(r.requirements.map(item => item.assignee_id).filter(Boolean))).map(memberId => {
-              const name = assigned.data?.items.find(member => member.id === memberId)?.name || 'Team member';
-              return <View key={memberId!} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.blueSoft, alignItems: 'center', justifyContent: 'center' }}><Label size={12} style={{ color: c.blue }}>{name.split(' ').slice(0, 2).map(part => part[0]).join('')}</Label></View>
-                <Label size={14}>{name}</Label>
-              </View>;
-            })}
-          </View>
-        </View>}
 
         {/* Source Emails & Actions */}
         <View style={{ gap: 12, marginTop: 28 }}>

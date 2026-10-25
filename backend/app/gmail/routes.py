@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException, Query, Backgroun
 from sqlalchemy import select, func
 from cryptography.fernet import Fernet
 import httpx
-from ..auth.sessions import require_member, require_admin, get_session
+from ..auth.sessions import require_member, require_account_owner, get_session
 from ..models import Mailbox, Message
 from .sync import run_in_process_sync
 
@@ -51,7 +51,7 @@ def sync(background_tasks: BackgroundTasks, request: Request, full: bool = Query
 
 
 @router.post('/mailbox/backfill', status_code=202)
-def backfill(background_tasks: BackgroundTasks, request: Request, days: int = Query(90, ge=1, le=365), member=Depends(require_admin), db=Depends(get_session)):
+def backfill(background_tasks: BackgroundTasks, request: Request, days: int = Query(90, ge=1, le=365), member=Depends(require_account_owner), db=Depends(get_session)):
     box = connected_mailbox(request, db, member.workspace_id)
     # Reset history inside the mailbox worker lock, after dispatch succeeds.
     queue_sync(request, background_tasks, box, days, full=True)
@@ -59,7 +59,7 @@ def backfill(background_tasks: BackgroundTasks, request: Request, days: int = Qu
 
 
 @router.post('/mailbox/disconnect')
-def disconnect(request: Request, member=Depends(require_admin), db=Depends(get_session)):
+def disconnect(request: Request, member=Depends(require_account_owner), db=Depends(get_session)):
     box = mailbox(db, member.workspace_id)
     if box:
         if box.encrypted_token and not request.app.state.settings.demo_enabled:
@@ -78,13 +78,13 @@ def disconnect(request: Request, member=Depends(require_admin), db=Depends(get_s
 
 
 @router.get('/mailbox/excluded')
-def excluded(offset: int = Query(0, ge=0), member=Depends(require_admin), db=Depends(get_session)):
+def excluded(offset: int = Query(0, ge=0), member=Depends(require_account_owner), db=Depends(get_session)):
     rows = db.scalars(select(Message).where(Message.workspace_id == member.workspace_id, Message.classification == 'irrelevant').order_by(Message.received_at.desc(), Message.id).offset(offset).limit(30))
     return {'items': [{'id': m.id, 'subject': m.subject, 'sender': m.sender, 'received_at': m.received_at} for m in rows]}
 
 
 @router.post('/mailbox/excluded/{id}/reprocess', status_code=202)
-def reprocess(id: str, request: Request, member=Depends(require_admin), db=Depends(get_session)):
+def reprocess(id: str, request: Request, member=Depends(require_account_owner), db=Depends(get_session)):
     message = db.get(Message, id)
     if not message or message.workspace_id != member.workspace_id:
         raise HTTPException(404, 'Message not found')

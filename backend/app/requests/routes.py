@@ -2,7 +2,7 @@ from copy import deepcopy
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import ValidationError
 from sqlalchemy import select
-from ..auth.sessions import get_session, require_member, require_admin
+from ..auth.sessions import get_session, require_member, require_account_owner
 from ..models import RequestRecord, Message, Mailbox
 from ..schemas import RequestCreate, RequestPatch
 from .service import create_request, output, owned, save_data, validate_assignees
@@ -70,7 +70,7 @@ def source(id:str,member=Depends(require_member),db=Depends(get_session)):
     if not m or m.workspace_id!=member.workspace_id or m.classification=='irrelevant': raise HTTPException(404,'Source not found')
     return {'id':m.id,'sender':m.sender,'subject':m.subject,'received_at':m.received_at,'body':m.body,'attachments':m.attachments,'gmail_url':'https://mail.google.com/mail/u/0/#all/'+m.thread_id}
 @router.post('/workspace/data/purge')
-def purge_workspace_data(member=Depends(require_admin),db=Depends(get_session)):
+def purge_workspace_data(member=Depends(require_account_owner),db=Depends(get_session)):
     from ..models import Reminder
     from sqlalchemy import delete
     req_ids=list(db.scalars(select(RequestRecord.id).where(RequestRecord.workspace_id==member.workspace_id)))

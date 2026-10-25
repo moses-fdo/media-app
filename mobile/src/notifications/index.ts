@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../auth/context';
 
 const tokenKey = 'media-ops-device-token';
-const configurationMessage = 'Phone notifications are not configured in this app build yet. You can save your reminder timing and continue without them. Ask your administrator for an updated app.';
+const configurationMessage = 'Phone notifications are not configured in this app build yet. You can save your reminder timing and continue without them. Install the latest app version to enable notifications.';
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === 'web' || !Device.isDevice) return null;

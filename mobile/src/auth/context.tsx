@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto';
 import {QueryClient,useQuery,focusManager} from '@tanstack/react-query';
 import {ApiClient} from '../api/client';
 import {Tokens,Me} from '../api/types';
+import {privateProfile} from './privateProfile';
 import {clearWorkspaceCache} from './cache';
 import {widgetPublisher} from '../widgets/native';
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:1,staleTime:30000},mutations:{retry:false}}});
@@ -175,7 +176,7 @@ export function AuthProvider({children}:{children:React.ReactNode}){
     return ()=>{active=false;onSession=null;};
   },[]);
 
-  const profile=useQuery({queryKey:['me'],queryFn:()=>api.get<Me>('/me'),enabled:ready&&!!tokens});
+  const profile=useQuery({queryKey:['me'],queryFn:async()=>privateProfile(await api.get<Me>('/me')),enabled:ready&&!!tokens});
   const me=tokens?(profile.data||null):null;
 
   return <Context.Provider value={{ready,profileLoading:!!tokens&&profile.isPending,tokens,me,authError:authError||(profile.error instanceof Error?profile.error.message:null),login:async()=>{setAuthError(null);await googleFlow('/auth/start')},logout:async()=>{try{const {unregisterCurrentDevice}=await import('../notifications');await unregisterCurrentDevice();await api.post('/auth/logout')}finally{await api.setSession(null)}},connectMailbox:async()=>{await googleFlow('/mailbox/connect');await queryClient.invalidateQueries()}}}>{children}</Context.Provider>;

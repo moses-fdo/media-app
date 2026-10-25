@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     source_retention_days: int = Field(default=90, ge=1, le=3650)
     allowed_domain: str = ''
     domain_auto_join: bool = False
+    personal_accounts: bool | None = None
     cors_origins: str = 'http://localhost:8081,http://localhost:8082'
     in_process_sync: bool | None = None
     rate_limit_enabled: bool | None = None
@@ -42,8 +43,10 @@ class Settings(BaseSettings):
                 Fernet(self.encryption_key.encode())
             except (ValueError, TypeError):
                 raise ValueError('ENCRYPTION_KEY must be a valid Fernet key')
+        if self.personal_accounts is None:
+            self.personal_accounts = self.environment != 'test'
         self.allowed_domain = self.allowed_domain.strip().lower()
-        if self.domain_auto_join:
+        if self.domain_auto_join and not self.personal_accounts:
             if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}', self.allowed_domain):
                 raise ValueError('DOMAIN_AUTO_JOIN requires an explicit ALLOWED_DOMAIN')
             if not self.admin_email or self.admin_email.strip().lower().rsplit('@', 1)[-1] != self.allowed_domain:
@@ -54,7 +57,7 @@ class Settings(BaseSettings):
         if self.rate_limit_enabled is None:
             self.rate_limit_enabled = production
         if production:
-            if self.demo_enabled or not self.encryption_key or not self.admin_email:
+            if self.demo_enabled or not self.encryption_key or (not self.personal_accounts and not self.admin_email):
                 raise ValueError('Production requires encryption/admin configuration and forbids demo mode')
             if not self.google_client_id or not self.google_client_secret:
                 raise ValueError('Production requires Google OAuth client credentials')

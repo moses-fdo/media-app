@@ -36,7 +36,7 @@ export default function SignIn(){
           <Label muted>Find the media requests that matter, without searching through hundreds of emails.</Label>
         </View>
         <View style={{gap:17,paddingVertical:20}}>
-          {['Requests organized by event and deadline','Audio and video requirements in one place','Your team’s events, kept in sync'].map(s=>(
+          {['Requests organized by event and deadline','Audio and video requirements in one place','Your events, kept in sync'].map(s=>(
             <View key={s} style={{flexDirection:'row',gap:12}}>
               <Check size={20} color={c.green}/>
               <Label style={{flex:1}}>{s}</Label>
@@ -46,7 +46,7 @@ export default function SignIn(){
         <ErrorNote error={error || authError}/>
         <Button title="Continue with Google" busy={busy} onPress={()=>enter()}/>
         {busy && <Label size={13} muted accessibilityLiveRegion="polite">Opening Google sign-in. The first connection can take up to 90 seconds while the sign-in service wakes up.</Label>}
-        <Label size={13} muted>Use your official @karunya.edu.in staff account. After sign-in, setup guides you through the shared mailbox, first sync and reminders. Gmail access is read-only.</Label>
+        <Label size={13} muted>Sign in with Google to find event requests in your Gmail. Only you can see your events. Gmail access is read-only.</Label>
       </ScrollView>
     </SafeAreaView>
   );

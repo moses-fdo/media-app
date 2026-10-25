@@ -95,4 +95,4 @@ def test_joined_staff_cannot_manage_members_or_connect_mailbox(app, client, monk
 def test_auto_join_requires_explicit_domain_and_admin():
     for values in ({'allowed_domain': '', 'admin_email': 'admin@example.edu'}, {'allowed_domain': 'example.edu', 'admin_email': ''}):
         with pytest.raises(ValueError):
-            Settings(_env_file=None, domain_auto_join=True, **values)
+            Settings(_env_file=None, personal_accounts=False, domain_auto_join=True, **values)

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Pressable, TextInput, useWindowDimensions, AccessibilityInfo, findNodeHandle, AppState } from 'react-native';
-import { MediaRequest, Requirement, Member } from '../../api/types';
+import { MediaRequest, Requirement } from '../../api/types';
 import { Label, Field, Button, ErrorNote, AnimatedPressable, ActionDialog, DialogAction } from '../../components/ui';
 import { useTheme, radius, spacing } from '../../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,8 +9,7 @@ import { ApiError } from '../../api/client';
 import { draftEpoch, draftKey, parseDraft, writeDraft, FormDraft, SavedDraft } from './drafts';
 import { DateField } from '../../components/DateField';
 import { localParts, parseLocalDate } from './form';
-import { useQuery } from '@tanstack/react-query';
-import { api, useAuth } from '../../auth/context';
+import { useAuth } from '../../auth/context';
 
 type FormProps = {
   initial?: MediaRequest; timezone: string; onSave: (data: any) => Promise<void>;
@@ -49,12 +48,10 @@ function RequestEditor({ initial: initialInput, timezone, onSave, onCancel, init
   const [initial] = useState(initialInput);
   const { colors: c } = useTheme();
   const { me } = useAuth();
-  const staff = useQuery({ queryKey: ['staff'], queryFn: () => api.get<{ items: Member[] }>('/workspace/members'), enabled: !!me });
   type Draft = Omit<Requirement, 'quantity'> & { quantityText: string };
   const originalEquipment: Draft[] = (initial?.requirements || []).map(item => ({ ...item, quantityText: item.quantity == null ? '' : String(item.quantity) }));
   const [equipment, setEquipment] = useState<Draft[]>(restored?.equipment || originalEquipment);
   const [contact, setContact] = useState(restored?.contact ?? (initial?.contact || ''));
-  const [assigning, setAssigning] = useState<string | null>(null);
   const sequence = useRef(0);
   function updateEquipment(id: string, changes: Partial<Draft>) {
     setEquipment(items => items.map(item => item.id === id ? { ...item, ...changes } : item));
@@ -232,7 +229,7 @@ function RequestEditor({ initial: initialInput, timezone, onSave, onCancel, init
 
       <Label size={20} bold accessibilityRole="header" style={{ marginTop: 12 }}>Schedule</Label>
       <Label size={13} muted>
-        Times are in {timezone}. Leave unknown dates blank for staff review.
+        Times are in {timezone}. Leave unknown dates blank for review.
       </Label>
 
       <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 12 }}>
@@ -288,7 +285,7 @@ function RequestEditor({ initial: initialInput, timezone, onSave, onCancel, init
       </View>
 
       <View style={{ gap: 16, marginTop: 12 }}>
-        <Label size={20} bold accessibilityRole="header">Equipment & assignments</Label>
+        <Label size={20} bold accessibilityRole="header">Equipment</Label>
         <Label size={13} muted>List the equipment, quantities and any setup notes.</Label>
         {equipment.map((item, index) => <View key={item.id} style={{ gap: 12, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: c.line }}>
           <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 10 }}>
@@ -299,12 +296,7 @@ function RequestEditor({ initial: initialInput, timezone, onSave, onCancel, init
             {(['audio','video','other'] as const).map(department => <Pressable key={department} accessibilityRole="radio" accessibilityLabel={`Equipment ${index + 1}: ${department}`} aria-checked={item.department === department} accessibilityState={{ checked: item.department === department }} onPress={() => updateEquipment(item.id, { department })} style={{ flex: 1, minHeight: 48, borderRadius: 8, backgroundColor: item.department === department ? c.blueSoft : c.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }}><Label size={13} style={{ color: item.department === department ? c.blue : c.muted }}>{department[0].toUpperCase() + department.slice(1)}</Label></Pressable>)}
           </View>
           <Field label={`Equipment ${index + 1} notes`} value={item.notes} onChangeText={value => updateEquipment(item.id, { notes: value })} placeholder="Location, cable or setup notes" />
-          <Button title={staff.data?.items.find(member => member.id === item.assignee_id)?.name || (item.assignee_id ? 'Assigned team member' : 'Assign staff')} quiet onPress={() => setAssigning(assigning === item.id ? null : item.id)} />
-          {assigning === item.id && <View style={{ gap: 4 }}>
-            {[{ id: '', name: 'Unassigned' }, ...(staff.data?.items || [])].map(member => <Pressable key={member.id} accessibilityRole="radio" accessibilityLabel={`Assign equipment ${index + 1} to ${member.name}`} aria-checked={(item.assignee_id || '') === member.id} onPress={() => { updateEquipment(item.id, { assignee_id: member.id || null }); setAssigning(null); }} style={{ minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' }}><Label size={14} style={{ color: (item.assignee_id || '') === member.id ? c.blue : c.ink }}>{member.name}</Label></Pressable>)}
-            <ErrorNote error={staff.error} />
-          </View>}
-          <Button title={`Remove equipment ${index + 1}`} quiet danger onPress={() => setEquipment(items => items.filter(other => other.id !== item.id))} />
+          <Button title={`Remove equipment ${index + 1}`} quiet danger onPress={() => setEquipment(items => items.filter(entry => entry.id !== item.id))} />
         </View>)}
         <Button title="Add equipment" quiet disabled={equipment.length >= 100} onPress={() => { sequence.current += 1; setEquipment(items => [...items, { id: `draft-${Date.now()}-${sequence.current}`, title: '', quantityText: '1', department: 'audio', notes: '', assignee_id: null, status: 'pending', version: 1 }]); }} />
       </View>

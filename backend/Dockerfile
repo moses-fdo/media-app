@@ -10,4 +10,4 @@ RUN useradd --create-home --uid 10001 media && chown -R media:media /app
 ENV PATH="/app/.venv/bin:$PATH"
 USER media
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn app.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]

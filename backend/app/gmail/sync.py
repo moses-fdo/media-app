@@ -2,6 +2,7 @@ import httpx
 from sqlalchemy import select,update
 from ..models import Message, now
 from .mime import parse_message
+from .access import may_read_mailbox
 
 def sync_mailbox(db,box,client,days=30):
     db.refresh(box)
@@ -61,7 +62,7 @@ def run_in_process_sync(settings, mailbox_id: str, days: int = 30, full: bool = 
     try:
         with sessions() as db:
             box = db.get(Mailbox, mailbox_id)
-            if not box or not box.encrypted_token or box.status=='reconnect_required':
+            if not box or not box.encrypted_token or box.status=='reconnect_required' or not may_read_mailbox(settings,db,box):
                 return
             try:
                 if full:box.history_id=None;db.commit()

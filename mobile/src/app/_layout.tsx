@@ -37,12 +37,12 @@ function Routes(){
         <Stack.Screen name="requests/[id]" options={{title:'',headerBackTitle:'Requests',headerLeft:makeHeaderLeft(c,'/','Requests')}}/>
         <Stack.Screen name="requests/new" options={{title:'Add request',presentation:'modal'}}/>
         <Stack.Screen name="source" options={{title:'Source email',headerLeft:makeHeaderLeft(c,'/','Back')}}/>
-        <Stack.Screen name="settings/mailbox" options={{title:'Mailbox',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
-        <Stack.Screen name="settings/staff" options={{title:'Staff directory',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
+        <Stack.Screen name="settings/mailbox" options={{title:'Gmail connection',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
+        <Stack.Screen name="settings/staff" options={{title:'Settings',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
         <Stack.Screen name="settings/widget" options={{title:'Home-screen widget',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
         <Stack.Screen name="settings/reminders" options={{title:'Reminders',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
         <Stack.Screen name="settings/template" options={{title:'Request template',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
-        <Stack.Screen name="settings/excluded" options={{title:'Excluded recovery',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
+        <Stack.Screen name="settings/excluded" options={{title:'Excluded emails',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
         </Stack.Protected>
         </Stack.Protected>
         <Stack.Protected guard={!tokens} redirectTo={me?'/':'/workspace'}>

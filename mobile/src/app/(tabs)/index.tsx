@@ -147,7 +147,7 @@ export default function Requests() {
             <Label size={13} muted style={{ flex: 1 }} accessibilityLiveRegion="polite">{mailbox.isLoading ? 'Checking Gmail connection…' : mailbox.error ? 'Connection status unavailable' : mailbox.data?.status === 'syncing' ? 'Checking incoming mail…' : mailbox.data?.status === 'error' ? 'Gmail sync needs attention' : mailbox.data?.status === 'reconnect_required' ? 'Gmail access has expired' : mailbox.data?.status === 'disconnected' ? 'Gmail is not connected' : mailbox.data?.last_synced ? 'Last synced ' + new Date(mailbox.data.last_synced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: me?.timezone || 'Asia/Kolkata' }) : 'Gmail connected · First sync pending'}</Label>
             <Pressable accessibilityRole="button" accessibilityLabel="Sync mailbox" accessibilityState={{ busy: activeSync, disabled: activeSync }} disabled={activeSync} onPress={refresh} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}><Animated.View style={{ transform: [{ rotate: spin }] }}><RefreshCw size={21} color={c.muted} strokeWidth={1.7} /></Animated.View></Pressable>
           </View>
-          {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginBottom: 16 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : me?.role === 'admin' ? 'Review the Gmail connection to keep requests up to date.' : 'Ask your administrator to check the shared Gmail connection.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
+          {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginBottom: 16 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : 'Reconnect your Gmail to keep requests up to date.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
           {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginBottom: 16 }}>{syncNotice}</Label>}
           {!search && !department && tab === 'active' && <View style={{ gap: 12, paddingBottom: 12 }}>
             {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line, gap: 3 }}><Label size={13} style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={17} bold>{nextEvent.title}</Label><Label size={13} muted>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label></Pressable>}
@@ -197,7 +197,7 @@ export default function Requests() {
               : tab === 'completed'
               ? 'Events you complete or cancel will appear here.'
               : mailboxIssue
-              ? 'Connect your department Gmail to import requests, or add an event yourself.'
+              ? 'Connect your Gmail to import requests, or add an event yourself.'
               : 'Incoming requests with [MEDIA REQUEST] in the subject will appear here automatically.'
           }
           action={

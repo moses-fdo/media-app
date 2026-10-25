@@ -71,7 +71,7 @@ def create_app(settings=None):
                 connection.execute(text('SELECT 1'))
                 if settings.environment == 'production':
                     revision = connection.execute(text('SELECT version_num FROM alembic_version')).scalar()
-                    if revision != '002':
+                    if revision != '003':
                         raise RuntimeError('Migrations required')
             if settings.rate_limit_enabled:
                 with Redis.from_url(settings.redis_url, socket_timeout=2, socket_connect_timeout=2) as queue:

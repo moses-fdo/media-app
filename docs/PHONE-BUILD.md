@@ -1,5 +1,15 @@
 # Physical Android phone build — 25 October 2026
 
+## Latest package — personal Gmail flow
+
+APK: `build/karunya-media-desk-1.2.0.apk`, also copied to `build/karunya-media-desk-phone.apk`. Version **1.2.0 (4)**, package `com.mediaops.staff`. Includes personal sign-in, simplified settings, optional setup, direct event entry and the private-profile backend gate. Requires the corresponding backend source deployed with schema migration 003 (the backend image runs migration before startup).
+
+Gradle assembleRelease succeeded after final source changes. APK archive integrity and v2 signature verified; the internal debug certificate matches the previous builds. The hosted API is bundled; local preview addresses and removed shared-account wording are absent. 123 backend tests passed (1 optional integration skipped), 78 mobile tests passed, TypeScript passed. No connected phone was used; real account/notification/native UI verification remains outstanding.
+
+Size: **53,175,866 bytes**. SHA-256: `6ca68dcf308c5b6053432803ddee06b82043700a7973d061f84131442f2ae8f4`.
+
+
+
 ## Latest package — Editorial Desk UI
 
 Latest APK: `build/karunya-media-desk-1.1.1.apk`, also copied to `build/karunya-media-desk-phone.apk`. Package `com.mediaops.staff`, version **1.1.1 (3)**. Includes the Editorial Desk Requests, Agenda and detail refinement.

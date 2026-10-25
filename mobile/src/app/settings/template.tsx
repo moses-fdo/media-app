@@ -94,7 +94,7 @@ export default function TemplateSettings() {
           </Label>
         </View>
         <Label size={13} style={{ color: c.ink, lineHeight: 19 }}>
-          Share this standard format with organizers and departments. The app reads the labelled fields and prepares a request for your team. Missing or conflicting details require review; reminders start after staff confirmation.
+          Share this standard format with organizers and departments. The app reads the labelled fields and prepares a request for you. Missing or conflicting details require review; reminders start after you confirm.
         </Label>
       </View>
 
@@ -198,7 +198,7 @@ export default function TemplateSettings() {
         <View style={{ gap: 10 }}>
           <View style={{ gap: 3 }}>
             <Label bold size={13}>Email Subject: [MEDIA REQUEST]</Label>
-            <Label size={12} muted>Always include [MEDIA REQUEST] in the subject line (e.g., "[MEDIA REQUEST] Youth Summit"). This helps identify the request. Staff can recover excluded messages from Settings if a request was missed.</Label>
+            <Label size={12} muted>Always include [MEDIA REQUEST] in the subject line (e.g., "[MEDIA REQUEST] Youth Summit"). This helps identify the request. You can recover excluded messages from Settings if a request was missed.</Label>
           </View>
           <View style={{ height: 1, backgroundColor: c.line }} />
 
@@ -216,7 +216,7 @@ export default function TemplateSettings() {
 
           <View style={{ gap: 3 }}>
             <Label bold size={13}>Event Time & Setup Deadline</Label>
-            <Label size={12} muted>Supports 12-hour (10:00 AM) or 24-hour (14:30) formats. Missing event times are never guessed. If setup time is omitted, a one-hour-before suggestion requires staff confirmation.</Label>
+            <Label size={12} muted>Supports 12-hour (10:00 AM) or 24-hour (14:30) formats. Missing event times are never guessed. If setup time is omitted, a one-hour-before suggestion requires your confirmation.</Label>
           </View>
           <View style={{ height: 1, backgroundColor: c.line }} />
 

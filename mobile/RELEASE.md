@@ -120,3 +120,7 @@ The 1.1.0 APK exposed missing Firebase initialization when enabling notification
 ## Editorial Desk package — 25 October 2026
 
 Version **1.1.1 (3)** is at `../build/karunya-media-desk-1.1.1.apk` and the stable phone APK path. It includes the latest Editorial Desk UI and configured Firebase resources. Build, package and signature checks passed; see `../docs/PHONE-BUILD.md`. No hardware install or push delivery was verified.
+
+## Personal Gmail package — 25 October 2026
+
+Version **1.2.0 (4)** is at `../build/karunya-media-desk-1.2.0.apk` and the stable phone APK path. It includes the personal Gmail flow and simplified interface. Requires the updated backend and migration 003. Package/signature checks passed; see `../docs/PHONE-BUILD.md`. Hardware and live Gmail delivery were not verified.

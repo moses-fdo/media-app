@@ -8,7 +8,7 @@ from sqlalchemy import select, update, delete
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request as GoogleRequest
 from cryptography.fernet import Fernet
-from .sessions import get_session, require_member, require_admin, digest, issue_session
+from .sessions import get_session, require_member, require_admin, require_account_owner, verify_personal_account, digest, issue_session
 from ..models import SessionToken, OAuthState, Member, Workspace, Mailbox, Device
 router=APIRouter(prefix='/api/v1')
 class Refresh(BaseModel): refresh_token: str=Field(min_length=1,max_length=256)
@@ -25,18 +25,18 @@ def oauth_start(request, body, db, member=None):
     c=request.app.state.settings
     if not c.valid_client_redirect(body.redirect_uri): raise HTTPException(400,'Use an approved app redirect URL')
     if not c.google_client_id or not c.google_client_secret: raise HTTPException(503,'Configure Google OAuth before connecting')
-    if member and not c.encryption_key: raise HTTPException(503,'Configure mailbox encryption key first')
+    if (member or c.personal_accounts) and not c.encryption_key: raise HTTPException(503,'Configure mailbox encryption key first')
     state=secrets.token_urlsafe(32); verifier=secrets.token_urlsafe(48)
     intent_str=('mailbox' if member else 'login')+(f"|{body.redirect_uri}" if body.redirect_uri else '')
     db.add(OAuthState(id=state,verifier=verifier,challenge=body.challenge,intent=intent_str,member_id=member.id if member else None,expires=time.time()+600));db.commit()
-    scopes='openid email profile'+(' https://www.googleapis.com/auth/gmail.readonly' if member else '')
-    params={'client_id':c.google_client_id,'redirect_uri':c.google_redirect_uri,'response_type':'code','scope':scopes,'state':state,'nonce':state,'code_challenge':challenge(verifier),'code_challenge_method':'S256','access_type':'offline','prompt':'consent' if member else 'select_account'}
-    if c.allowed_domain: params['hd']=c.allowed_domain
+    scopes='openid email profile'+(' https://www.googleapis.com/auth/gmail.readonly' if member or c.personal_accounts else '')
+    params={'client_id':c.google_client_id,'redirect_uri':c.google_redirect_uri,'response_type':'code','scope':scopes,'state':state,'nonce':state,'code_challenge':challenge(verifier),'code_challenge_method':'S256','access_type':'offline','prompt':'consent select_account' if c.personal_accounts else ('consent' if member else 'select_account')}
+    if c.allowed_domain and not c.personal_accounts: params['hd']=c.allowed_domain
     return {'url':'https://accounts.google.com/o/oauth2/v2/auth?'+urlencode(params)}
 @router.post('/auth/start')
 def start(body:Start,request:Request,db=Depends(get_session)): return oauth_start(request,body,db)
 @router.post('/mailbox/connect')
-def connect(body:Start,request:Request,member=Depends(require_admin),db=Depends(get_session)): return oauth_start(request,body,db,member)
+def connect(body:Start,request:Request,member=Depends(require_account_owner),db=Depends(get_session)): return oauth_start(request,body,db,member)
 @router.get('/auth/callback')
 def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(get_session)):
     c=request.app.state.settings
@@ -60,7 +60,7 @@ def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(ge
         response.raise_for_status(); tokens=response.json()
         identity=id_token.verify_oauth2_token(tokens['id_token'],GoogleRequest(),c.google_client_id)
         if not identity.get('email_verified') or identity.get('nonce')!=state: raise ValueError('Invalid identity')
-        if c.allowed_domain and not identity.get('email','').lower().endswith(f"@{c.allowed_domain.lower()}"):
+        if c.allowed_domain and not c.personal_accounts and not identity.get('email','').lower().endswith(f"@{c.allowed_domain.lower()}"):
             err_msg=f"Only @{c.allowed_domain} accounts are permitted to sign in"
             if custom_redirect:
                 return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':err_msg})}")
@@ -70,7 +70,16 @@ def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(ge
         if custom_redirect:
             return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':'Google connection failed. Please try again.'})}")
         raise HTTPException(400,'Google connection failed. Please try again.')
-    if base_intent=='mailbox':
+    if c.personal_accounts:
+        from .personal import complete_personal_sign_in
+        try:
+            member=complete_personal_sign_in(db,c,identity,tokens,values['member_id'] if base_intent=='mailbox' else None)
+        except HTTPException as failure:
+            db.rollback()
+            if custom_redirect:
+                return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':failure.detail})}")
+            raise
+    elif base_intent=='mailbox':
         member=db.get(Member,values['member_id'])
         if not member or not member.active or member.role!='admin':
             if custom_redirect:
@@ -123,7 +132,7 @@ def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(ge
     db.add(OAuthState(id=digest(handoff),verifier='',challenge=values['challenge'],intent='handoff',member_id=member.id,expires=time.time()+90));db.commit()
     return RedirectResponse(f"{target_redirect}{sep}{urlencode({'code':handoff})}")
 @router.post('/auth/exchange')
-def exchange(body:Exchange,db=Depends(get_session)):
+def exchange(body:Exchange,request:Request,db=Depends(get_session)):
     state=db.get(OAuthState,digest(body.code))
     if not state or state.intent!='handoff' or state.expires<time.time() or not secrets.compare_digest(state.challenge,challenge(body.verifier)): raise HTTPException(400,'Expired or invalid sign-in code')
     member_id=state.member_id
@@ -131,15 +140,17 @@ def exchange(body:Exchange,db=Depends(get_session)):
     if used.rowcount!=1: raise HTTPException(400,'Sign-in code already used')
     member=db.get(Member,member_id)
     if not member or not member.active: raise HTTPException(403,'Access removed')
+    verify_personal_account(request.app.state.settings,db,member)
     result=issue_session(db,member_id);db.commit();return result
 @router.post('/auth/refresh')
-def refresh(body:Refresh,db=Depends(get_session)):
+def refresh(body:Refresh,request:Request,db=Depends(get_session)):
     token=db.get(SessionToken,digest(body.refresh_token))
     if not token or token.kind!='refresh': raise HTTPException(401,'Invalid session')
     if token.revoked:
         db.execute(update(SessionToken).where(SessionToken.family==token.family).values(revoked=True));db.commit();raise HTTPException(401,'Session reuse detected. Sign in again.')
     member=db.get(Member,token.member_id)
     if token.expires<time.time() or not member or not member.active: raise HTTPException(401,'Session expired')
+    verify_personal_account(request.app.state.settings,db,member)
     claimed=db.execute(update(SessionToken).where(SessionToken.token_hash==token.token_hash,SessionToken.revoked==False).values(revoked=True))
     if claimed.rowcount!=1: raise HTTPException(401,'Session already refreshed')
     result=issue_session(db,member.id,token.family);db.commit();return result
@@ -150,11 +161,12 @@ def logout(member=Depends(require_member),db=Depends(get_session)):
 @router.get('/me')
 def me(request:Request,member=Depends(require_member),db=Depends(get_session)):
     w=db.get(Workspace,member.workspace_id)
-    return {'id':member.id,'name':member.name,'email':member.email,'role':member.role,'workspace_id':w.id,'workspace_name':w.name,'timezone':w.timezone,'preferences':member.preferences,'demo':request.app.state.settings.demo_enabled}
+    return {'id':member.id,'name':member.name,'email':member.email,'role':member.role,'workspace_id':w.id,'workspace_name':w.name,'account_mode':'personal' if request.app.state.settings.personal_accounts else 'shared','timezone':w.timezone,'preferences':member.preferences,'demo':request.app.state.settings.demo_enabled}
 class MemberInput(BaseModel):
     email:str=Field(pattern=r'^[^@\s]+@[^@\s]+\.[^@\s]+$');name:str='Staff';role:str=Field(default='staff',pattern='^(staff|admin)$')
 @router.get('/workspace/members')
-def members(member=Depends(require_member),db=Depends(get_session)):
+def members(request:Request,member=Depends(require_member),db=Depends(get_session)):
+    if request.app.state.settings.personal_accounts: raise HTTPException(403,'This account does not support sharing.')
     return {'items':[{'id':m.id,'email':m.email,'name':m.name,'role':m.role} for m in db.scalars(select(Member).where(Member.workspace_id==member.workspace_id,Member.active==True))]}
 @router.post('/workspace/members',status_code=201)
 def add_member(body:MemberInput,request:Request,member=Depends(require_admin),db=Depends(get_session)):
