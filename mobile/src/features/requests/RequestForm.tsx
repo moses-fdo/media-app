@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Pressable, TextInput, useWindowDimensions, AccessibilityInfo, findNodeHandle, AppState } from 'react-native';
+import { View, Pressable, TextInput, useWindowDimensions, AccessibilityInfo, findNodeHandle, AppState, Alert } from 'react-native';
 import { MediaRequest, Requirement, Member } from '../../api/types';
 import { Label, Field, Button, ErrorNote, AnimatedPressable, ActionDialog, DialogAction } from '../../components/ui';
 import { useTheme, radius, spacing } from '../../theme';
@@ -146,6 +146,7 @@ function RequestEditor({ initial: initialInput, timezone, onSave, onCancel, init
     }
   }
   function confirmLeave(next: () => void) {
+    // Alert.alert('Discard changes?', 'You have unsaved changes.')
     setDialog({ title: 'Leave this request?', message: 'Save a draft on this device to continue later, or discard your changes.', actions: [
       { title: 'Save draft and leave', onPress: () => leave(false, next) },
       { title: 'Discard changes', danger: true, onPress: () => leave(true, next) },
