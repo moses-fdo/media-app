@@ -23,13 +23,14 @@ def connected_mailbox(request, db, workspace):
 
 
 def queue_sync(request, background_tasks, box, days=30, full=False):
+    if request.app.state.settings.in_process_sync:
+        background_tasks.add_task(run_in_process_sync, request.app.state.settings, box.id, days, full, True)
+        return
     try:
         from ..jobs.tasks import sync_one
         sync_one.delay(box.id, days, full=full, retry_failed=True)
     except Exception:
-        if not request.app.state.settings.in_process_sync:
-            raise HTTPException(503, 'Background queue unavailable. Retry synchronization shortly.')
-        background_tasks.add_task(run_in_process_sync, request.app.state.settings, box.id, days, full, True)
+        raise HTTPException(503, 'Background queue unavailable. Retry synchronization shortly.')
 
 
 @router.get('/mailbox/status')

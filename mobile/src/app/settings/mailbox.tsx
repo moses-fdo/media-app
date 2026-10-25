@@ -16,6 +16,10 @@ export default function MailboxSettings() {
   const query = useQuery({
     queryKey: ['mailbox'],
     queryFn: () => api.get<Mailbox>('/mailbox/status'),
+    refetchInterval: (q) => {
+      const data = q.state.data;
+      return (data?.status === 'syncing' || (data?.queued ?? 0) > 0 || busy) ? 2000 : 15000;
+    },
   });
 
   const m = query.data;
@@ -25,7 +29,14 @@ export default function MailboxSettings() {
     setError(null);
     try {
       await api.post('/mailbox/sync');
-      await query.refetch();
+      await queryClient.invalidateQueries();
+      for (let i = 0; i < 8; i++) {
+        const res = await query.refetch();
+        if (res.data?.last_synced && res.data?.status !== 'syncing') {
+          break;
+        }
+        await new Promise(r => setTimeout(r, 1500));
+      }
     } catch (e) {
       setError(e);
     } finally {
@@ -111,7 +122,13 @@ export default function MailboxSettings() {
           <Label bold size={15}>{m?.email || 'None connected'}</Label>
 
           <Label size={14} muted>Last Successful Sync</Label>
-          <Label size={15}>{m?.last_synced ? new Date(m.last_synced).toLocaleString() : 'Never'}</Label>
+          <Label size={15} style={{ color: m?.status === 'syncing' ? c.blue : c.ink }}>
+            {m?.status === 'syncing'
+              ? 'Syncing in progress…'
+              : m?.last_synced
+              ? new Date(m.last_synced).toLocaleString()
+              : 'Never (Tap "Sync now" below to sync)'}
+          </Label>
 
           {m?.error ? (
             <View style={{ padding: 10, backgroundColor: c.amberSoft, borderRadius: 8 }}>

@@ -6,25 +6,28 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Pressable,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight,
   Mail,
   MapPin,
   Clock3,
   Pencil,
-  CalendarDays,
   AlertTriangle,
-  User,
+  ArrowLeft,
+  Check,
+  Landmark,
 } from 'lucide-react-native';
 import { api, queryClient, useAuth } from '../../auth/context';
 import { MediaRequest } from '../../api/types';
 import { layout, radius, useTheme } from '../../theme';
 import { Label, Button, ErrorNote, AnimatedPressable } from '../../components/ui';
+import { Brand } from '../../components/Brand';
 import { useCachedQuery } from '../../features/requests/useCachedQuery';
-import { dateLabel, clock, statusLabel } from '../../features/requests/presentation';
+import { dateLabel, clock } from '../../features/requests/presentation';
 import { RequestForm } from '../../features/requests/RequestForm';
 import { ProposalChanges } from '../../features/requests/ProposalChanges';
 import { EquipmentList } from '../../features/requests/EquipmentList';
@@ -157,123 +160,122 @@ export default function Detail() {
     !!r.setup_deadline &&
     new Date(r.setup_deadline).getTime() < Date.now();
 
-  const tone =
-    r.status === 'completed'
-      ? c.green
-      : r.status === 'needs_review'
-      ? c.amber
-      : c.blue;
-
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* Top Header Bar matching Campus Modern mockup */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: layout.gutter,
+          paddingVertical: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: c.line,
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to Requests"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          style={{ width: 44, height: 44, alignItems: 'flex-start', justifyContent: 'center' }}
+        >
+          <ArrowLeft size={24} color={c.ink} strokeWidth={2} />
+        </Pressable>
+
+        <Brand size={26} />
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Edit request"
+          onPress={() => setEditing(true)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            minHeight: 44,
+            paddingHorizontal: 8,
+          }}
+        >
+          <Pencil size={16} color={c.blue} strokeWidth={2.2} />
+          <Label bold size={15} style={{ color: c.blue }}>
+            Edit
+          </Label>
+        </Pressable>
+      </View>
+
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: layout.gutter,
-          paddingTop: 14,
+          paddingTop: 16,
           paddingBottom: 36,
           width: '100%',
           maxWidth: layout.contentWidth,
           alignSelf: 'center',
         }}
       >
-        {/* Header & Status */}
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Label size={14} style={{ color: tone }}>{statusLabel(r.status)}</Label>
-            <AnimatedPressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit request"
-              onPress={() => setEditing(true)}
-              activeScale={0.92}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 12,
-                minHeight: 48,
-                paddingVertical: 10,
-                borderRadius: radius.md,
-                backgroundColor: 'transparent',
-              }}
-            >
-              <Pencil size={15} color={c.blue} />
-              <Label bold size={13} style={{ color: c.blue }}>
-                Edit
-              </Label>
-            </AnimatedPressable>
+        {/* Title */}
+        <Label size={30} bold style={{ letterSpacing: -0.6, color: c.ink, lineHeight: 36 }}>
+          {r.title}
+        </Label>
+
+        {/* Metadata List matching Campus Modern mockup */}
+        <View style={{ gap: 10, marginTop: 14 }}>
+          {/* Department / Organizer */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Landmark size={18} color={c.ink} />
+            <Label size={15} bold style={{ color: c.ink }}>
+              {r.organizer || 'Academic Office'}
+            </Label>
           </View>
 
-          <Label size={34} bold style={{ lineHeight: 42, letterSpacing: -0.8, color: c.ink }}>
-            {r.title}
+          {/* Schedule */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Clock3 size={18} color={c.ink} />
+            <Label size={15} style={{ color: c.ink }}>
+              {dateLabel(r.event_start, r.timezone)}
+              {r.event_start ? ' · ' + clock(r.event_start, r.timezone) : ''}
+            </Label>
+          </View>
+
+          {/* Venue */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <MapPin size={18} color={c.ink} />
+            <Label size={15} style={{ color: c.ink }}>
+              {r.venue || 'Main Auditorium'}
+            </Label>
+          </View>
+        </View>
+
+        {/* Setup Deadline Alert Banner matching Campus Modern mockup */}
+        <View
+          style={{
+            backgroundColor: c.amberSoft,
+            borderRadius: 12,
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginTop: 18,
+          }}
+        >
+          <Clock3 size={20} color={c.amber} />
+          <Label bold size={15} style={{ color: c.amberText, flex: 1 }}>
+            {overdue
+              ? 'Setup overdue: ' + clock(r.setup_deadline!, r.timezone)
+              : r.setup_deadline
+              ? 'Setup deadline: ' +
+                (new Intl.DateTimeFormat('en-CA', { timeZone: r.timezone || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(r.setup_deadline)) ===
+                new Intl.DateTimeFormat('en-CA', { timeZone: r.timezone || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+                  ? 'Today, ' + clock(r.setup_deadline, r.timezone)
+                  : dateLabel(r.setup_deadline, r.timezone) + ', ' + clock(r.setup_deadline, r.timezone))
+              : 'Setup deadline: Needs confirmation'}
           </Label>
+        </View>
 
-          {/* Organizer Card */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              paddingVertical: 8,
-            }}
-          >
-            <User size={19} color={c.muted} />
-            <View style={{ flex: 1 }}>
-              <Label size={16}>
-                {r.organizer || 'Organizer to confirm'}
-              </Label>
-            </View>
-          </View>
-
-          {/* Venue & Timing Card */}
-          <View
-            style={{
-              paddingVertical: 14,
-              gap: 10,
-            }}
-          >
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-              <MapPin size={18} color={c.muted} />
-              <Label size={16} style={{ flex: 1 }}>
-                {r.venue || 'Venue to confirm'}
-              </Label>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-              <CalendarDays size={18} color={c.muted} />
-              <Label size={16} style={{ flex: 1 }}>
-                {dateLabel(r.event_start, r.timezone)}
-                {r.event_start ? ' · ' + clock(r.event_start, r.timezone) : ''}
-              </Label>
-            </View>
-          </View>
-
-          {/* Setup Deadline Banner */}
-          <View
-            style={{
-              backgroundColor: 'transparent',
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: c.line,
-              flexDirection: 'row',
-              gap: 12,
-              alignItems: 'center',
-
-            }}
-          >
-            <Clock3 color={overdue ? c.red : c.amber} size={24} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Label size={12} bold style={{ color: overdue ? c.red : c.amber }}>
-                {overdue ? 'Setup overdue' : 'Setup deadline'}
-              </Label>
-              <Label bold size={16} style={{ color: overdue ? c.red : c.amber }}>
-                {r.setup_deadline
-                  ? dateLabel(r.setup_deadline, r.timezone) +
-                    ' · ' +
-                    clock(r.setup_deadline, r.timezone)
-                  : 'Needs confirmation'}
-              </Label>
-            </View>
-          </View>
+        {/* Divider Line */}
+        <View style={{ height: 1, backgroundColor: c.line, marginTop: 22 }} />
 
           {r.summary ? (
             <View
@@ -315,7 +317,7 @@ export default function Detail() {
               <Label size={13} style={{ color: c.ink, lineHeight: 18 }}>
                 This request was extracted from an email matching the Karunya Media Desk template. Please verify the event logistics and equipment quantities before confirming.
               </Label>
-              {r.review_reasons.map((reason) => (
+              {(r.review_reasons || []).map((reason) => (
                 <View key={reason} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.amber }} />
                   <Label size={13} bold style={{ color: c.amber, flex: 1 }}>
@@ -326,7 +328,7 @@ export default function Detail() {
             </View>
           )}
 
-          {r.status !== 'needs_review' && r.review_reasons.map((reason) => (
+          {r.status !== 'needs_review' && (r.review_reasons || []).map((reason) => (
             <View
               key={reason}
               style={{
@@ -346,10 +348,9 @@ export default function Detail() {
               </Label>
             </View>
           ))}
-        </View>
 
         {/* Proposed Updates from new emails */}
-        {r.proposed_updates.map((p) => (
+        {(r.proposed_updates || []).map((p) => (
           <View
             key={p.id}
             style={{
@@ -410,44 +411,87 @@ export default function Detail() {
           </View>
         ))}
 
-        <EquipmentList requirements={r.requirements} />
+        <EquipmentList requirements={r.requirements || []} />
 
         {/* Source Emails & Actions */}
-        <View style={{ gap: 12, marginTop: 28 }}>
-          <Label bold size={21} accessibilityRole="header">Source emails</Label>
-          {r.sources.map((s, i) => (
-            <AnimatedPressable
-              key={s}
-              accessibilityRole="button"
-              accessibilityLabel={
-                'View source email' + (r.sources.length > 1 ? ' ' + (i + 1) : '')
-              }
-              onPress={() => router.push({ pathname: '/source', params: { id: s } })}
-              activeScale={0.98}
+        <View style={{ gap: 12, marginTop: 24 }}>
+          {(r.sources || []).length > 0 ? (
+            (r.sources || []).map((s, i) => (
+              <AnimatedPressable
+                key={s}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  'View source email' + ((r.sources || []).length > 1 ? ' ' + (i + 1) : '')
+                }
+                onPress={() => router.push({ pathname: '/source', params: { id: s } })}
+                activeScale={0.98}
+                style={{
+                  minHeight: 52,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: c.cardBorder,
+                  backgroundColor: c.card,
+                }}
+              >
+                <Mail size={18} color={c.ink} />
+                <Label style={{ flex: 1, fontSize: 15, color: c.ink }}>
+                  {'View source email' + ((r.sources || []).length > 1 ? ' #' + (i + 1) : '')}
+                </Label>
+                <ChevronRight size={18} color={c.muted} />
+              </AnimatedPressable>
+            ))
+          ) : (
+            <View
               style={{
                 minHeight: 52,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: c.cardBorder,
+                backgroundColor: c.card,
               }}
             >
-              <Mail size={18} color={c.blue} />
-              <Label style={{ flex: 1, fontSize: 15 }}>
-                {'View source email' + (r.sources.length > 1 ? ' #' + (i + 1) : '')}
+              <Mail size={18} color={c.muted} />
+              <Label muted style={{ flex: 1, fontSize: 15 }}>
+                Manual entry (no source email)
               </Label>
-              <ChevronRight size={18} color={c.muted} />
-            </AnimatedPressable>
-          ))}
+            </View>
+          )}
 
-          {!done && <Button title="Cancel event" quiet danger disabled={busy} onPress={() => Alert.alert('Cancel event?', 'Future reminders will be cancelled. The request and source emails will stay available.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Cancel event', style: 'destructive', onPress: () => act({ status: 'cancelled' }) }])} />}
+          {!done && (
+            <Button
+              title="Cancel event"
+              quiet
+              danger
+              disabled={busy}
+              onPress={() =>
+                Alert.alert(
+                  'Cancel event?',
+                  'Future reminders will be cancelled. The request and source emails will stay available.',
+                  [
+                    { text: 'Keep event', style: 'cancel' },
+                    { text: 'Cancel event', style: 'destructive', onPress: () => act({ status: 'cancelled' }) },
+                  ]
+                )
+              }
+            />
+          )}
           <Button
             title="Dismiss as not a media request"
             quiet
             disabled={busy}
             danger
             onPress={handleDismiss}
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 4 }}
           />
         </View>
       </ScrollView>
@@ -471,32 +515,35 @@ export default function Detail() {
           }}
         >
           <ErrorNote error={error} />
-          {!!r.proposed_updates.length && <Label muted size={13} style={{ marginBottom: 8 }}>Accept or dismiss pending email updates before continuing.</Label>}
-          {['needs_review', 'new'].includes(r.status) ? (
-            <Button
-              title="Confirm request"
-              disabled={!!r.proposed_updates.length}
-              busy={busy}
-              onPress={() => act({ status: 'confirmed' })}
-            />
-          ) : (
-            <Button
-              title={
-                done
-                  ? 'Reopen request'
-                  : 'Mark request completed'
-              }
-              disabled={!!r.proposed_updates.length}
-              busy={busy}
-              onPress={() =>
-                act({
-                  status: done ? 'in_progress' : 'completed',
-                })
-              }
-            />
+          {!!r.proposed_updates?.length && (
+            <Label muted size={13} style={{ marginBottom: 8 }}>
+              Accept or dismiss pending email updates before continuing.
+            </Label>
           )}
+          <Button
+            title={
+              ['needs_review', 'new'].includes(r.status)
+                ? 'Confirm request'
+                : done
+                ? 'Reopen request'
+                : 'Mark completed'
+            }
+            icon={!done && !['needs_review', 'new'].includes(r.status) ? <Check size={20} color={c.onAccent} strokeWidth={2.5} /> : undefined}
+            disabled={!!r.proposed_updates?.length}
+            busy={busy}
+            onPress={() =>
+              act({
+                status: ['needs_review', 'new'].includes(r.status)
+                  ? 'confirmed'
+                  : done
+                  ? 'in_progress'
+                  : 'completed',
+              })
+            }
+            style={{ minHeight: 52, borderRadius: 14 }}
+          />
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

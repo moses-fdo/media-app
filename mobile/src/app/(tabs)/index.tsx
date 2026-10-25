@@ -67,6 +67,16 @@ export default function Requests() {
     });
     return () => sub.remove();
   }, [mailbox.data?.status]);
+  const lastSyncedRef = useRef(mailbox.data?.last_synced);
+  useEffect(() => {
+    if (!mailbox.data?.last_synced) return;
+    if (lastSyncedRef.current && lastSyncedRef.current !== mailbox.data.last_synced) {
+      query.refetch();
+      focus.refetch();
+    }
+    lastSyncedRef.current = mailbox.data.last_synced;
+  }, [mailbox.data?.last_synced]);
+
   useEffect(() => {
     if (requestedAfter === undefined) return;
     if (mailbox.data?.status === 'connected' && mailbox.data.last_synced && mailbox.data.last_synced !== requestedAfter && mailbox.data.queued === 0) {
@@ -131,44 +141,110 @@ export default function Requests() {
         sections={sections}
         keyExtractor={item => item.id}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingTop: 18, paddingBottom: 40, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}
+        contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingTop: 14, paddingBottom: 80, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}
         refreshing={activeSync}
         onRefresh={refresh}
         ListHeaderComponent={<View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Brand />
-            <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push('/settings')} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}><View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }}><Label size={16}>{me?.name?.[0] || 'M'}</Label></View></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push('/settings')} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }}>
+                <Label bold size={15} style={{ color: c.ink }}>{me?.name?.[0] || 'M'}</Label>
+              </View>
+            </Pressable>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
-            <Label size={36} bold accessibilityRole="header" style={{ letterSpacing: -1 }}>Requests</Label>
-            <Button title="New" icon={<Plus color={c.onAccent} size={20} />} onPress={() => router.push('/requests/new')} style={{ minHeight: 48, paddingHorizontal: 14, paddingVertical: 9 }} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 12 }}>
-            <Label size={13} muted style={{ flex: 1 }} accessibilityLiveRegion="polite">{mailbox.isLoading ? 'Checking Gmail connection…' : mailbox.error ? 'Connection status unavailable' : mailbox.data?.status === 'syncing' ? 'Checking incoming mail…' : mailbox.data?.status === 'error' ? 'Gmail sync needs attention' : mailbox.data?.status === 'reconnect_required' ? 'Gmail access has expired' : mailbox.data?.status === 'disconnected' ? 'Gmail is not connected' : mailbox.data?.last_synced ? 'Last synced ' + new Date(mailbox.data.last_synced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: me?.timezone || 'Asia/Kolkata' }) : 'Gmail connected · First sync pending'}</Label>
-            <Pressable accessibilityRole="button" accessibilityLabel="Sync mailbox" accessibilityState={{ busy: activeSync, disabled: activeSync }} disabled={activeSync} onPress={refresh} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}><Animated.View style={{ transform: [{ rotate: spin }] }}><RefreshCw size={21} color={c.muted} strokeWidth={1.7} /></Animated.View></Pressable>
-          </View>
-          {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginBottom: 16 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : 'Reconnect your Gmail to keep requests up to date.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
-          {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginBottom: 16 }}>{syncNotice}</Label>}
-          {!search && !department && tab === 'active' && <View style={{ gap: 12, paddingBottom: 12 }}>
-            {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line, gap: 3 }}><Label size={13} style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={17} bold>{nextEvent.title}</Label><Label size={13} muted>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label></Pressable>}
-          </View>}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surfaceSubtle, borderRadius: 12, paddingHorizontal: 14 }}>
-              <Search size={18} color={c.muted} />
-              <TextInput accessibilityLabel="Search requests" value={search} onChangeText={value => { setSearch(value); resetPage(); }} placeholder="Search requests" placeholderTextColor={c.muted} style={{ flex: 1, minWidth: 0, minHeight: 48, fontSize: 15, color: c.ink }} />
-              {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setSearch(''); resetPage(); }} style={{ minHeight: 48, width: 48, alignItems: 'center', justifyContent: 'center' }}><X size={17} color={c.muted} /></Pressable>}
+
+          <View style={{ marginTop: 18 }}>
+            <Label size={34} bold accessibilityRole="header" style={{ letterSpacing: -0.8, color: c.ink }}>Requests</Label>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+              <Label size={13} muted accessibilityLiveRegion="polite">
+                {mailbox.isLoading
+                  ? 'Checking Gmail connection…'
+                  : mailbox.error
+                  ? 'Connection status unavailable'
+                  : mailbox.data?.status === 'syncing'
+                  ? 'Checking incoming mail…'
+                  : mailbox.data?.status === 'error'
+                  ? 'Gmail sync needs attention'
+                  : mailbox.data?.status === 'reconnect_required'
+                  ? 'Gmail access has expired'
+                  : mailbox.data?.status === 'disconnected'
+                  ? 'Gmail is not connected'
+                  : mailbox.data?.last_synced
+                  ? 'Last synced just now'
+                  : 'Gmail connected · First sync pending'}
+              </Label>
+              <Pressable accessibilityRole="button" accessibilityLabel="Sync mailbox" accessibilityState={{ busy: activeSync, disabled: activeSync }} disabled={activeSync} onPress={refresh} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <RefreshCw size={14} color={c.muted} strokeWidth={2} />
+                </Animated.View>
+              </Pressable>
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Filter requests" aria-expanded={filtersOpen} accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={{ width: 48, height: 48, borderWidth: 1, borderColor: department ? c.blue : c.line, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: department ? c.blueSoft : 'transparent' }}><SlidersHorizontal size={20} color={department ? c.blue : c.muted} /></Pressable>
           </View>
+
+          {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginTop: 12, marginBottom: 12 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : 'Reconnect your Gmail to keep requests up to date.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
+          {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginTop: 8, marginBottom: 8 }}>{syncNotice}</Label>}
+
+          {!search && !department && tab === 'active' && <View style={{ gap: 8, paddingVertical: 6 }}>
+            {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line, gap: 2 }}><Label size={12} bold style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={16} bold>{nextEvent.title}</Label><Label size={13} muted>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label></Pressable>}
+          </View>}
+
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder, borderRadius: 24, paddingHorizontal: 16 }}>
+              <Search size={18} color={c.muted} />
+              <TextInput
+                accessibilityLabel="Search requests"
+                value={search}
+                onChangeText={value => { setSearch(value); resetPage(); }}
+                placeholder="Search events, departments, or keywords"
+                placeholderTextColor={c.muted}
+                style={{ flex: 1, minWidth: 0, minHeight: 46, fontSize: 14, color: c.ink }}
+              />
+              {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setSearch(''); resetPage(); }} style={{ minHeight: 46, width: 36, alignItems: 'center', justifyContent: 'center' }}><X size={16} color={c.muted} /></Pressable>}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Filter requests"
+              aria-expanded={filtersOpen}
+              accessibilityState={{ expanded: filtersOpen }}
+              onPress={() => setFiltersOpen(!filtersOpen)}
+              style={{ width: 46, height: 46, borderWidth: 1, borderColor: department ? c.blue : c.cardBorder, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: department ? c.blueSoft : c.card }}
+            >
+              <SlidersHorizontal size={18} color={department ? c.blue : c.muted} />
+            </Pressable>
+          </View>
+
           {(!!search || !!department) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 8 }}><Label size={13} style={{ flex: 1, color: c.blue }}>{department ? department[0].toUpperCase() + department.slice(1) + ' equipment' : 'All equipment'}{search ? ` · “${search}”` : ''}</Label><Button title="Clear filters" quiet onPress={() => { setSearch(''); setDepartment(''); resetPage(); }} /></View>}
           {filtersOpen && <View style={{ paddingTop: 14, gap: 8 }}><Label size={12} muted>Equipment department</Label><View accessibilityRole="radiogroup" accessibilityLabel="Equipment department" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[['', 'All'], ['audio', 'Audio'], ['video', 'Video'], ['other', 'Other']].map(([key, label]) => <Pressable key={key} accessibilityRole="radio" accessibilityLabel={label} aria-checked={department === key} accessibilityState={{ checked: department === key }} onPress={() => { setDepartment(key); resetPage(); }} style={{ flex: 1, minWidth: 64, minHeight: 48, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: department === key ? c.blueSoft : c.surfaceSubtle }}><Label size={13} bold={department === key} style={{ color: department === key ? c.blue : c.muted }}>{label}</Label></Pressable>)}</View></View>}
-          <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 18 }}>
+
+          <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 14 }}>
             {[['active', 'Active'], ['completed', 'Done']].map(([key, label]) => {
+              const isSel = tab === key;
               const countVal = key === 'active' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
               return (
-                <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}>
-                  <Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label>
-                  <Label size={12} bold style={{ color: tab === key ? c.blue : c.muted, backgroundColor: tab === key ? c.blueSoft : 'transparent', paddingHorizontal: 6, borderRadius: 6 }}>{countVal}</Label>
+                <Pressable
+                  key={key}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${label} requests`}
+                  aria-selected={isSel}
+                  accessibilityState={{ selected: isSel }}
+                  onPress={() => { setTab(key); resetPage(); }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderBottomWidth: 2,
+                    borderBottomColor: isSel ? c.blue : 'transparent',
+                  }}
+                >
+                  <Label bold={isSel} size={15} style={{ color: isSel ? c.blue : c.muted }}>{label}</Label>
+                  {countVal !== '' && (
+                    <View style={{ backgroundColor: isSel ? c.blueBorder : c.surfaceSubtle, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                      <Label bold size={12} style={{ color: isSel ? c.blueText : c.muted }}>{countVal}</Label>
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
@@ -177,7 +253,13 @@ export default function Requests() {
           {(!!query.error || !!syncError) && <Button title="Retry loading requests" quiet busy={activeSync} onPress={refresh} style={{ marginTop: 12 }} />}
           {query.offline && <Label size={13} style={{ color: c.amber, marginTop: 12 }}>Offline · Showing saved requests</Label>}
         </View>}
-        renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 4 }}><Label bold size={13} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.muted }}>{section.title}</Label><Label muted size={12}>{section.data.length} {section.data.length === 1 ? 'event' : 'events'}</Label></View>}
+        renderSectionHeader={({ section }) => (
+          <View style={{ paddingTop: 20, paddingBottom: 6 }}>
+            <Label bold size={18} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.ink }}>
+              {section.title}
+            </Label>
+          </View>
+        )}
         renderItem={({ item }) => <RequestRow item={item} onPress={() => router.push('/requests/' + item.id)} />}
         ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty
           title={
@@ -206,6 +288,33 @@ export default function Requests() {
         />}
         ListFooterComponent={cursor !== 'END' && (cursor || query.data?.next_cursor) ? <Button title="Load more requests" quiet busy={paging} onPress={next} style={{ marginTop: 20 }} /> : undefined}
       />
+
+      {/* Floating Action Button (FAB) */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="New request"
+        onPress={() => router.push('/requests/new')}
+        style={{
+          position: 'absolute',
+          right: layout.gutter,
+          bottom: 24,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: c.blue,
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 24,
+          shadowColor: c.blue,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 6,
+        }}
+      >
+        <Plus size={18} color={c.onAccent} strokeWidth={2.5} />
+        <Label bold size={14} style={{ color: c.onAccent }}>New request</Label>
+      </Pressable>
     </SafeAreaView>
   );
 }

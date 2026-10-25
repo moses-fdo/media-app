@@ -34,7 +34,7 @@ function Routes(){
         </Stack.Protected>
         <Stack.Protected guard={setup.ready&&!setup.required} redirectTo="/setup">
         <Stack.Screen name="(tabs)" options={{headerShown:false}}/>
-        <Stack.Screen name="requests/[id]" options={{title:'',headerBackTitle:'Requests',headerLeft:makeHeaderLeft(c,'/','Requests')}}/>
+        <Stack.Screen name="requests/[id]" options={{headerShown:false}}/>
         <Stack.Screen name="requests/new" options={{title:'Add request',presentation:'modal'}}/>
         <Stack.Screen name="source" options={{title:'Source email',headerLeft:makeHeaderLeft(c,'/','Back')}}/>
         <Stack.Screen name="settings/mailbox" options={{title:'Gmail connection',headerLeft:makeHeaderLeft(c,'/settings','Settings')}}/>
