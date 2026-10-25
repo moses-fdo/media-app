@@ -1,0 +1,14 @@
+<resources>
+  <string name="upcoming_widget_name">Karunya · Upcoming events</string>
+  <string name="upcoming_widget_description">Your next events, with dates, times and venues. Tap to open a request.</string>
+  <string name="upcoming_widget_heading">Upcoming events</string>
+  <string name="upcoming_widget_agenda">Open agenda</string>
+  <string name="upcoming_widget_connect">Your events, at a glance</string>
+  <string name="upcoming_widget_connect_body">Open Media Desk and sign in to sync your upcoming events.</string>
+  <string name="upcoming_widget_stale">Time for a refresh</string>
+  <string name="upcoming_widget_stale_body">Open Media Desk to update your saved events.</string>
+  <string name="upcoming_widget_empty">Nothing coming up</string>
+  <string name="upcoming_widget_empty_body">Future events will appear here after the app syncs.</string>
+  <string name="upcoming_widget_not_synced">Waiting for app sync</string>
+  <string name="upcoming_widget_updated">Updated %1$s</string>
+</resources>

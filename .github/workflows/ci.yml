@@ -1,0 +1,73 @@
+name: Validate application
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: local-ci-only
+          POSTGRES_DB: media_ci
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+psycopg://postgres:local-ci-only@localhost:5432/media_ci
+      REDIS_URL: redis://localhost:6379/0
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:local-ci-only@localhost:5432/media_ci
+      TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+        working-directory: backend
+      - run: uv run --frozen pytest -q
+        working-directory: backend
+      - run: uv tool run pip-audit --path backend/.venv/lib/python3.12/site-packages --timeout 60
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: backend-job-diagnostics
+          path: build/celery-integration.log
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run check:release
+      - run: npx expo install --check
+      - run: npm run build:web
+      - run: npx expo export --platform android --output-dir dist-android
+      - name: Record dependency advisories for release review
+        run: npm audit --json > npm-audit.json
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit
+          path: mobile/npm-audit.json

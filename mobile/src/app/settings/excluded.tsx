@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { RefreshCw } from 'lucide-react-native';
+
 import { api, useAuth, queryClient } from '../../auth/context';
-import { useTheme } from '../../theme';
+import { layout, useTheme } from '../../theme';
 import { Label, Button, ErrorNote, Empty } from '../../components/ui';
 
 interface ExcludedMessage {
@@ -55,7 +55,7 @@ export default function ExcludedSettings() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50, gap: 20 }}>
+    <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
       <Label size={26} bold>Excluded Email Recovery</Label>
       <Label muted size={14}>
         Emails classified as irrelevant or general announcements are not shown on the Requests screen. If an email contained a valid media request, you can reprocess it here.
@@ -76,11 +76,7 @@ export default function ExcludedSettings() {
             <View
               key={item.id}
               style={{
-                padding: 16,
-                backgroundColor: c.surface,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: c.line,
+                paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.line,
                 gap: 8,
               }}
             >

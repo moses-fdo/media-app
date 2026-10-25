@@ -1,55 +1,49 @@
-# Media Ops release readiness — 24 October 2026
+# Media Desk release readiness — 25 October 2026
 
-This is a release candidate, not a published or certified error-free production service. Passing local/demo tests does not verify Gmail, AI extraction, FCM/APNs delivery, hosted workers or physical-device behavior.
+This is a locally tested release candidate. It has not been deployed or published. Live Gmail consent, physical-device push delivery and private release signing remain release gates.
 
-## Changes in this pass
+## Delivered
 
-- Applied the selected Paper & Cobalt UI to the Expo mobile request list, details, navigation and shared controls, with matching supporting screens.
-- Added a generated cobalt M/request-sheet logo, opaque launcher icon, Android adaptive icon and native light/dark splash configuration. Original assets remain available. Built-in image generation was used; source prompts are recorded in the branding notes.
-- Clear cached workspace requests on sign-out/session expiry, preserve native Text props on shared labels, expose notification-registration failures and configure the Android notification channel/Expo project ID.
-- Handle reminder notification taps by opening their request, including cold launches after sign-in.
-- Added release configuration guards for public HTTPS API and demo-disabled production builds. Production native signing reads a private keystore from environment variables instead of falling back to Expo's debug key.
-- Added a Windows local APK helper and documented preview, production signing and AAB commands in `mobile/RELEASE.md`.
-- Fixed SQLite in-memory connections so tables remain available across request threads; this matters for isolated local smoke testing.
-- Updated six Expo packages to the SDK's recommended compatible patch versions. Disabled optional web route splitting so local previews load the small app together instead of pausing on each first screen visit.
+The mail/template/review workflow now preserves omitted information, surfaces ambiguous dates and quantities, displays proposed changes before acceptance and protects concurrent staff edits. Equipment can be added, edited, assigned and removed. Reminders wait for explicit confirmation; interrupted delivery claims and failed extraction have recovery paths.
 
-## Publication gates
+Production configuration, OAuth redirects, request limits, shared Redis rate limits, session revocation, migrations, queue failures and non-root containers are guarded. The deterministic parser handles supported text/PDF/DOCX requests; it does not require an AI provider. See [production hardening](PRODUCTION-HARDENING.md) for implementation and limits.
 
-1. Deploy HTTPS API, PostgreSQL migrations, Redis, Celery workers and one Beat scheduler. Verify health, readiness, backups/restoration and worker processing. Put authentication rate limiting and request size limits at the reverse proxy; the API does not currently implement distributed rate limiting.
-2. Supply and verify Google OAuth client/redirect/consent, actual staff access, department Gmail consent, encryption key and configured AI provider. Smoke-test a real request, ambiguous dates, follow-up proposal, supported attachment and reconnect flow. No real-service credentials were supplied or used in this pass.
-3. Verify ownership of `com.mediaops.staff` and the EAS project ID in `mobile/app.json`. Configure Android FCM credentials and iOS APNs/signing if shipping iPhone. Test notification permission, background delivery, tapping alerts, logout and revocation on physical devices.
-4. Build with the private production signing key and cold-launch on a real device. Verify native splash, adaptive icon, Android back navigation, keyboard, offline handling and larger system text. A preview APK has now compiled successfully and its debug signature verifies; physical-device and production-key verification remain required.
-5. Resolve or explicitly assess the dependency audit findings below before publication. Do not run `npm audit fix --force`: it proposes changing the Expo SDK major version, which can break native compatibility.
-6. Complete privacy policy, support URL, retention policy, Google OAuth verification where required, Play Data Safety/store listing, screenshots and release versionCode. Preserve the upload key and perform an internal testing rollout before public publication.
+The app uses the new Karunya K identity across the launcher and interface. Requests, review details, equipment editing, calendar Agenda and supporting screens use the selected design. Selecting an Agenda date shows that day's events. Protected web routes recover through sign-in and profile loading; the web build is a single-page application.
 
-## Dependency audit
-
-The installed Expo CLI chain reports `node-forge@1.4.0` (GHSA-86w9-cpqp-85rv) and `zod@3.25.76` (GHSA-mrhx-c7xc-m3w5). Registry inspection during this pass reports node-forge 1.4.0 as latest and Expo CLI 58.1.15 as latest. A forced override to Zod 4 would replace a major-version API used by Expo CLI. These findings are documented rather than hidden or addressed through an untested SDK downgrade. They are build-tool dependencies, but a release decision must still assess them. Check current registry/advisories again before release.
-
-References: [node-forge advisory](https://github.com/advisories/GHSA-86w9-cpqp-85rv), [Zod advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), [Expo local build overview](https://docs.expo.dev/guides/local-app-overview/), [Expo splash screen release testing](https://docs.expo.dev/versions/latest/sdk/splash-screen/).
-
-## Verification results
+## Verification
 
 | Check | Result |
 | --- | --- |
-| Backend `uv run --frozen pytest -q` | 22 passed; one upstream Starlette TestClient deprecation warning |
-| Mobile `npm run check:release` | TypeScript passed; 7 suites / 12 tests passed, runner exits normally |
-| Expo `install --check` | Dependencies up to date after compatible patch updates |
-| Android `expo export --platform android` | Passed; 5.7 MB Hermes bundle plus assets in `mobile/dist-android` |
-| Expo Android prebuild | Passed for preview and production configuration; generated light/dark splash resources |
-| Production signing plugin | Generated Gradle selects `signingConfigs.release` and environment-based keystore values |
-| PowerShell APK helper | Syntax passed; required SDK/JDK paths are now installed and configured |
-| UI detector | No findings on changed request list, row and detail targets |
-| Windows Android toolchain | Installed SDK Platform 37.0, Build Tools 37.0.0, Platform Tools 37.0.1, NDK 27.1.12297006, CMake 3.22.1/3.30.5 and Gradle 9.4.1; verified Java 21, ADB, apksigner, CMake and Clang execution |
-| Native preview APK | Windows PowerShell 5.1 helper completed `:app:assembleRelease`; 109,338,916-byte universal APK; `apksigner verify --verbose --print-certs` passed APK Signature Scheme v2 with the Android Debug certificate |
-| Physical-device / production-key verification | Not run; preview includes demo mode and emulator API origin `http://10.0.2.2:8000` |
-| Live Gmail, AI provider and push | Not run: external credentials/services not configured for this pass |
-| Dependency audit | Unresolved upstream advisories remain; publication gate |
+| Backend | 91 tests passed, including real PostgreSQL/Redis/Celery integration, concurrent extraction and actual PDF/DOCX subprocess parsing |
+| Mobile | TypeScript passed; 29 tests passed across 11 suites, including stale edits during background refresh |
+| Production-mode containers | API, worker and scheduler ran locally; health/readiness 200, unauthenticated API 401, demo endpoint 404, authenticated API success, UID 10001 and scheduled worker execution verified |
+| Web | Expo SPA export passed; anonymous deep links reach sign-in, authenticated fixture opens Requests; review acceptance, equipment editing and narrow-screen layout checked in the actual Expo app |
+| Dependency compatibility | Expo SDK dependency check passed |
+| Python dependency audit | No known vulnerabilities reported in Windows and Linux application environments |
+| npm dependency audit | Five high-severity package reports remain in the Expo tooling chain, rooted in two upstream advisories; publication gate |
+| Native Android | Final preview APK built successfully on 25 October; APK v2 signature verified; packaged Hermes bundle matches the latest source. Physical-device and production-key validation remain open |
+| GitHub CI | Workflow added locally; not run on GitHub in this chat |
 
-Browser smoke testing uses the actual Expo web rendering and an isolated synthetic demo backend, not a handcrafted HTML replacement. Verified login, request search, Needs review filtering, requirement state mutation, source viewing, completion, reopening, Agenda, Settings, dark appearance and sign-out. Verified saved workspace-cache entries fell from 2 to 0 on sign-out. Inspected the request list/detail at 390 pixels and source at 320 pixels. Fixed an invalid raw text node in the source view and adjusted bottom navigation height for labels. Real Android and iPhone device checks remain required.
+Browser fixtures use synthetic mail/profile data. API integration tests use isolated local services and a simulated Google provider. Neither establishes live Google access or real push delivery. One upstream Starlette TestClient deprecation warning remains in backend tests.
 
-The older `VALIDATION.md` is a historical report from 23 October and does not by itself establish current release readiness. No app has been published in this pass.
+## Android preview
 
-SDK path correction: the original AppData installation was redirected into Codex/MSIX app storage. The complete SDK was copied to the shared `D:\Android\Sdk` directory. The build helper now discovers that directory before stale environment values and supports explicit `-SdkRoot` and `-CheckOnly`. Verified the dependency check in Windows PowerShell 5.1 with intentionally invalid SDK and Java environment paths; it resolved the shared SDK and Android Studio Java 21 and ran ADB/Java successfully.
+The Windows build helper produces `mobile/android/app/build/outputs/apk/release/app-release.apk`. This preview uses Android debug signing, demo enabled and the emulator API origin `http://10.0.2.2:8000`; it is for internal testing with a local backend. It is not the store artifact or a build configured for the hosted production API.
 
-Local build follow-up: stopped the project's Expo preview that held Lightning CSS's native module open, restored dependencies with `npm ci`, and added lockfile-hash-based reuse so routine builds do not delete a working installation. Added the project-local Java socket directory workaround. Updated SDK-bundled Ninja 1.10.2 to checksum-verified official Ninja 1.13.2, preserving original binaries, after reproducing Reanimated's Windows long-path compilation failure. The subsequent complete native preview build succeeded and APK signature verification passed. Output: `mobile/android/app/build/outputs/apk/release/app-release.apk`. Native compilation still emits upstream deprecation warnings; the result does not establish error-free runtime behavior or production readiness.
+Final verification on 25 October: Gradle `assembleRelease` succeeded, APK archive integrity passed, and `apksigner verify --verbose --print-certs` verified the Android Debug certificate using APK Signature Scheme v2. The 108,546,644-byte APK identifies as `com.mediaops.staff`, version 1.0.0 (1), label Karunya Media Desk, with arm64-v8a, armeabi-v7a, x86 and x86_64 libraries. Source-map inspection confirms the final edit-version fix, and the packaged Hermes bundle exactly matches that verified output. No device was connected for an installed-app test.
+
+SHA-256: `1a9bf508fa6fb74e9abde9e3df621498fb8760e3d2d2f5a85d30e9ffeca796dc`.
+
+The shared SDK is `D:/Android/Sdk`, with Android Studio Java 21. The build helper includes the Windows cross-drive Kotlin and Java socket workarounds. Native compilation emits upstream deprecation warnings. See [mobile release instructions](../mobile/RELEASE.md) for private signing and production API configuration.
+
+## Before launch
+
+1. Deploy the HTTPS API/frontend with migration 002, PostgreSQL, Redis, workers and one scheduler. Verify a backup restore, restart recovery, readiness and queue monitoring. Follow [deployment instructions](DEPLOYMENT.md).
+2. Configure real Google OAuth consent, approved callbacks and the department mailbox. Run actual template, informal request, attachment, follow-up, review, exclusion recovery and reconnect cases through the deployment.
+3. Configure the private upload key and FCM/APNs as appropriate. Test login, offline recovery, reminders, notification taps, logout and the installed icon on physical devices. iOS needs its own signing/build environment.
+4. Resolve or explicitly assess the remaining Expo tooling advisories. Do not force an Expo SDK downgrade or a Zod major override to obtain an artificially clean audit.
+5. Complete privacy/support/retention information, any required Google verification, store declarations and an internal testing rollout before public publication.
+
+The remaining npm reports concern [node-forge](https://github.com/advisories/GHSA-86w9-cpqp-85rv) and [Zod](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5). Compatible fixes and removal of unused EAS CLI reduced the initial 24 reports to five. These are build-tool dependencies; they still require review before release.
+
+Older VALIDATION.md and UI-only reports are historical snapshots. No existing hosted API, Gmail account, push service or app-store release was modified by these checks.

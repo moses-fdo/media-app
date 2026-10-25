@@ -1,0 +1,5 @@
+<resources>
+  <color name="upcoming_bg">#16191E</color><color name="upcoming_ink">#F1F2F3</color>
+  <color name="upcoming_muted">#B1B7C3</color><color name="upcoming_accent">#A8BEFF</color>
+  <color name="upcoming_line">#353B46</color>
+</resources>

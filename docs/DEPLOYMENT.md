@@ -1,97 +1,47 @@
-# Media Ops — Deployment & Production Operations
+# Deployment and operations
 
-This document outlines deployment architecture, container orchestration, worker scheduling, backup strategies, and native mobile release pipelines.
+The supported production topology is PostgreSQL + Redis + API + Celery worker + exactly one Beat scheduler, behind an HTTPS reverse proxy. The API does not silently fall back to in-process jobs in production. The parser is deterministic; no LLM provider or AI API key is currently used.
 
----
+## Configure
 
-## 1. Production Architecture Overview
+Copy `backend/.env.production.example` to a private `backend/.env.production`. Fill the actual database password/URL, a newly generated Fernet encryption key, Google web OAuth client credentials, callback URL, initial administrator email and approved frontend origin. Keep the key backed up; changing it without re-encrypting stored mailbox tokens prevents reconnection.
 
-The system consists of three server tiers and native client builds:
+`CORS_ORIGINS` contains HTTPS browser origins only, without paths or trailing slashes. The configured native return URI is `mediaops://auth`; optional exact app URLs can be listed in `CLIENT_REDIRECT_URIS`. Browser return paths must belong to approved origins. A workspace is linked to one department Gmail account; reconnect that original account rather than silently swapping its source history to another inbox.
 
-1. **FastAPI Web Service**: Authenticated JSON API over HTTPS with rate limiting, PKCE authorization exchange, and row-level workspace scoping.
-2. **Celery Asynchronous Workers**:
-   - `sync_mailbox`: Periodic polling of connected Gmail accounts (every 2 minutes) with incremental history tracking and per-mailbox locking.
-   - `extract_one`: Structured LLM request classification, requirement extraction, and attachment processing.
-   - `deliver_due_reminders`: Periodic scheduler claiming due setup alarms and dispatching notifications through Expo Push.
-3. **PostgreSQL & Redis**: Durable transactional storage with row-version optimistic concurrency and high-throughput job queue.
-4. **Native Expo Mobile Client**: iOS and Android builds distributed via EAS Build or internal enterprise distribution.
+Set `FORWARDED_ALLOW_IPS` to the trusted reverse proxy address/CIDR for the actual host. Avoid a public wildcard: authentication rate limits use the server's trusted client IP. Configure the reverse proxy using `infra/Caddyfile` or `infra/nginx.conf`, replacing the example host/certificate values.
 
----
+## Start
 
-## 2. Docker Compose Deployment
+From the repository root:
 
-The `infra/compose.yaml` file configures all required server services:
-
-```bash
-cd infra
-docker compose up -d
+```sh
+docker compose --env-file backend/.env.production -f infra/compose.yaml config --quiet
+docker compose --env-file backend/.env.production -f infra/compose.yaml up -d --build
 ```
 
-### Services Defined:
-- **`postgres`**: PostgreSQL 16 with persistent volume `pgdata`.
-- **`redis`**: Redis 7 for Celery message broker and cache.
-- **`api`**: FastAPI service running under Uvicorn workers.
-- **`worker`**: Celery worker running `sync_one`, `extract_one`, and delivery jobs.
-- **`scheduler`**: Celery Beat triggering 2-minute syncs and reminder evaluations.
+The API runs `alembic upgrade head` before starting. Existing installations require revision **002** for recoverable reminder leases. Back up and test the migration on a restored copy before upgrading the hosted database. API production startup does not create/alter tables automatically.
 
----
+PostgreSQL and Redis are private Compose services. Only loopback port 8000 is exposed for the host's HTTPS reverse proxy. The API readiness check verifies the database, migration revision and Redis. Workers start after API readiness. Run one scheduler; scaling Beat creates duplicate scheduled jobs.
 
-## 3. HTTPS & Reverse Proxy
+## Verify before publishing
 
-Terminate TLS at a reverse proxy such as Caddy or Nginx:
+- `/health` and `/ready` return 200 through the intended proxy. An unauthenticated request to `/api/v1/requests` returns 401; `/api/v1/auth/demo` is unavailable in production.
+- Staff Google login, unauthorized account rejection, mailbox read-only consent, token refresh/reconnect and logout work on the real frontend/native origins.
+- Only new email with a [MEDIA REQUEST] subject and the required organizer, venue, date, event time, setup deadline and equipment sections is admitted. Invalid values inside an otherwise matching template go to Review; missing headers, casual requests and subject tags alone are excluded. Staff confirmation enables reminders. Structured venue-only replies in an existing tagged request thread preserve equipment/times and show a reviewable proposal.
+- A supported attachment populates fields; conflicting/scanned content requires review. Recovery of excluded messages requires an administrator and access to the original Gmail message.
+- API/worker restart preserves requests, proposals and reminders. Scheduled tasks reach workers. Inspect failed-message counts and processing errors instead of relying only on mailbox last-sync time.
+- Due reminders submit and receive receipts on actual devices. Verify revoked staff and logged-out devices no longer receive pushes. A successful local mock does not establish FCM/APNs delivery.
 
-```nginx
-server {
-    server_name api.mediaops.yourdomain.edu;
+## Backups and monitoring
 
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+Keep encrypted PostgreSQL backups outside the container volume and regularly restore one into a separate database. Keep the Fernet key and release signing key in secure backed-up storage. A database-only restore without the encryption key cannot decrypt Gmail authorization.
 
----
+Monitor `/ready`, container restarts, worker task failures, Gmail `reconnect_required`/`error` state, failed message counts, overdue `pending`/`sending` reminders, push receipt failures and source-retention jobs. API logs avoid returning internal exceptions to clients. Reminder delivery can retry after an interrupted claim and is at least once across an ambiguous network/crash boundary.
 
-## 4. Database Migrations & Backups
+The retention job expires processed source bodies/attachments after `SOURCE_RETENTION_DAYS`, preserving headers and request records. It also removes expired OAuth state and old session records. Startup never deletes requests based on text classification. Account removal revokes active sessions/devices; deleting stored workspace data is an explicit administrator action and does not delete Gmail messages.
 
-### Running Migrations:
-```bash
-cd backend
-uv run alembic upgrade head
-```
+## Native builds
 
-### Automated Backup Recommendation:
-Run daily encrypted `pg_dump` snapshots:
-```bash
-pg_dump -U media_ops -d media_ops_db -Fc | gzip > /backups/db-$(date +%F).dump.gz
-```
+Follow `mobile/RELEASE.md`. Preview APKs use debug signing and are for internal testing. A signed production release needs the operator's private keystore, public HTTPS API, demo disabled, platform push credentials and physical-device checks. EAS CLI is an optional external release tool, not an application dependency.
 
----
-
-## 5. Mobile EAS Build & Store Distribution
-
-To build native release binaries using Expo Application Services:
-
-```bash
-cd mobile
-
-# Log in to Expo account
-npx eas-cli login
-
-# Configure project
-npx eas-cli build:configure
-
-# Build for Android (AAB for Google Play Store)
-npx eas-cli build --platform android --profile production
-
-# Build for iOS (IPA for Apple App Store / TestFlight)
-npx eas-cli build --platform ios --profile production
-```
-
-### Push Notification Credentials:
-- Configure **Google Firebase Cloud Messaging (FCM) v1** credentials for Android notifications in EAS.
-- Configure **Apple Push Notification service (APNs)** authentication key (`.p8`) for iOS notifications in the Apple Developer Console.
+See `PRODUCTION-HARDENING.md` and `RELEASE-READINESS.md` for current verification and remaining publication gates.

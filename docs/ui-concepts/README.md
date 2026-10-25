@@ -1,5 +1,7 @@
 # Media Ops UI concepts
 
+Current implementation: the Studio Production Desk redesign is documented in `../../mobile/DESIGN.md`. Actual screenshots from synthetic browser fixtures use the `redesign-*.png` prefix. The earlier generated alternatives below are retained as history.
+
 Generated 24 October 2026 with the built-in image generation tool. Visual concepts only; application code was not changed. Each image compares the Requests list and request detail.
 
 Recommendation: Paper & Cobalt for the default interface; Backstage informs the optional dark theme. Warm Studio is an alternative softer direction.

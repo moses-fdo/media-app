@@ -1,14 +1,20 @@
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select,update
 from ..models import Message, now
 from .mime import parse_message
 
 def sync_mailbox(db,box,client,days=30):
+    db.refresh(box)
+    if not box.encrypted_token or box.status=='reconnect_required':return
     box.status='syncing';box.error=None;db.commit()
+    from ..extraction.cleanup import exclude_non_template_imports
+    exclude_non_template_imports(db, box)
     initial=not box.history_id
     checkpoint=client.profile()['historyId'] if initial else box.history_id
     token=None
     while True:
+        db.refresh(box)
+        if not box.encrypted_token or box.status=='reconnect_required':return
         try:page=client.list_messages(token,days) if initial else client.list_history(checkpoint,token)
         except httpx.HTTPStatusError as e:
             if not initial and e.response.status_code==404:
@@ -25,9 +31,10 @@ def sync_mailbox(db,box,client,days=30):
             db.add(Message(workspace_id=box.workspace_id,mailbox_id=box.id,provider_id=id,thread_id=raw.get('threadId',id),**parse_message(raw)));db.commit()
         token=page.get('nextPageToken')
         if not token:
-            box.history_id=checkpoint if initial else page.get('historyId',checkpoint);box.last_synced=now();box.status='connected';db.commit();break
+            db.execute(update(type(box)).where(type(box).id==box.id,type(box).encrypted_token!='',type(box).status!='reconnect_required').values(history_id=checkpoint if initial else page.get('historyId',checkpoint),last_synced=now(),status='connected'))
+            db.commit();db.refresh(box);break
 
-def run_in_process_sync(settings, mailbox_id: str, days: int = 30):
+def run_in_process_sync(settings, mailbox_id: str, days: int = 30, full: bool = False, retry_failed: bool = False):
     import base64
     from ..database import database
     from ..models import Mailbox
@@ -40,15 +47,16 @@ def run_in_process_sync(settings, mailbox_id: str, days: int = 30):
     try:
         with sessions() as db:
             box = db.get(Mailbox, mailbox_id)
-            if not box:
+            if not box or not box.encrypted_token or box.status=='reconnect_required':
                 return
             try:
+                if full:box.history_id=None;db.commit()
                 client = GmailClient(settings, box)
                 sync_mailbox(db, box, client, days)
                 
                 provider = ExtractionProvider(settings)
                 queued = db.scalars(
-                    select(Message).where(Message.mailbox_id == mailbox_id, Message.status.in_(['queued', 'failed'])).limit(100)
+                    select(Message).where(Message.mailbox_id == mailbox_id, Message.status.in_(['queued', 'failed'] if retry_failed else ['queued'])).order_by(Message.status.desc(),Message.received_at).limit(100)
                 ).all()
                 for m in queued:
                     try:

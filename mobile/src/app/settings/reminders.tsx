@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { Bell, Check } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { api, useAuth, queryClient } from '../../auth/context';
-import { useTheme } from '../../theme';
+import { layout, useTheme } from '../../theme';
 import { Label, Button, ErrorNote } from '../../components/ui';
 import { registerForPushNotifications } from '../../notifications';
 
@@ -23,9 +23,11 @@ export default function ReminderSettings() {
   const [busy, setBusy] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   function toggle(min: number) {
+    setSaved(false);
     if (selected.includes(min)) {
       if (selected.length === 1) {
         Alert.alert('At Least One Reminder', 'Select at least one reminder offset.');
@@ -43,7 +45,7 @@ export default function ReminderSettings() {
     try {
       await api.put('/reminder-preferences', { offsets: selected });
       await queryClient.invalidateQueries();
-      Alert.alert('Saved', 'Your reminder preferences have been updated.');
+      setSaved(true);
     } catch (e) {
       setError(e);
     } finally {
@@ -62,14 +64,14 @@ export default function ReminderSettings() {
         setPushStatus('Notifications permission was not granted or device is a simulator.');
       }
     } catch (e) {
-      setPushStatus('Unable to register push notifications.');
+      setPushStatus(e instanceof Error ? e.message : 'Unable to enable notifications. Try again later.');
     } finally {
       setPushBusy(false);
     }
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50, gap: 20 }}>
+    <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
       <Label size={26} bold>Deadline Reminders</Label>
       <Label muted size={14}>
         The system schedules alerts before each confirmed setup deadline. Completed and cancelled requests automatically cancel future reminders.
@@ -85,20 +87,21 @@ export default function ReminderSettings() {
             <Pressable
               key={opt.minutes}
               accessibilityRole="checkbox"
+              accessibilityLabel={opt.label}
+              aria-checked={isChecked}
               accessibilityState={{ checked: isChecked }}
               onPress={() => toggle(opt.minutes)}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: 16,
-                backgroundColor: c.surface,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: isChecked ? c.blue : c.line,
+                paddingVertical: 18,
+                borderBottomWidth: 1,
+                borderBottomColor: c.line,
+                gap: 12,
               }}
             >
-              <Label bold={isChecked}>{opt.label}</Label>
+              <Label bold={isChecked} style={{ flex: 1 }}>{opt.label}</Label>
               <View
                 style={{
                   width: 24,
@@ -111,25 +114,26 @@ export default function ReminderSettings() {
                   justifyContent: 'center',
                 }}
               >
-                {isChecked && <Check size={14} color={c.surface} />}
+                {isChecked && <Check size={14} color={c.onAccent} />}
               </View>
             </Pressable>
           );
         })}
       </View>
 
-      <Button title="Save Reminder Offsets" busy={busy} onPress={handleSave} />
+      {saved && <Label accessibilityLiveRegion="polite" style={{ color: c.green }}>Reminder preferences saved.</Label>}
+      <Button title="Save reminders" busy={busy} onPress={handleSave} />
 
       <View style={{ height: 1, backgroundColor: c.line, marginVertical: 8 }} />
 
       <View style={{ gap: 10 }}>
         <Label bold size={16}>Device Notifications</Label>
         <Label size={13} muted>
-          Register this phone with Expo Push Service to receive background setup alerts.
+          Receive setup reminders on this phone, including when the app is closed.
         </Label>
         {pushStatus && (
           <View style={{ padding: 12, backgroundColor: c.blueSoft, borderRadius: 8 }}>
-            <Label size={13} style={{ color: c.blue }}>{pushStatus}</Label>
+            <Label size={13} accessibilityLiveRegion="polite" style={{ color: c.blue }}>{pushStatus}</Label>
           </View>
         )}
         <Button

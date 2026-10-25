@@ -1,13 +1,13 @@
-import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
-import { List, CalendarDays, Settings } from 'lucide-react-native';
+import { ActivityIndicator, View, useWindowDimensions } from 'react-native';
+import { ClipboardList, CalendarDays, Settings } from 'lucide-react-native';
 import { useAuth } from '../../auth/context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { ready, tokens } = useAuth();
   const { colors: c } = useTheme();
 
@@ -30,14 +30,14 @@ export default function TabsLayout() {
         tabBarActiveTintColor: c.blue,
         tabBarInactiveTintColor: c.muted,
         tabBarStyle: {
-          height: 64 + insets.bottom,
-          backgroundColor: c.surface,
+          height: Math.max(64, 48 + 16 * fontScale) + insets.bottom,
+          backgroundColor: c.bg,
           borderTopColor: c.line,
           borderTopWidth: 1,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '500',
         },
         tabBarItemStyle: {
           paddingTop: 8,
@@ -49,7 +49,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Requests',
-          tabBarIcon: ({ color, size }) => <List color={color} size={size} strokeWidth={2} />,
+          tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen

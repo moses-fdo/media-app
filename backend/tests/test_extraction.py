@@ -33,6 +33,30 @@ def test_attachment_limits_and_unsupported():
     assert extract_attachment(b'abc','image/png')['status']=='manual_review'
     assert extract_attachment(b'x'*(10*1024*1024+1),'application/pdf')['status']=='manual_review'
 
+def test_actual_docx_attachment_text_is_extracted():
+    from app.extraction.attachments import extract_attachment
+    from docx import Document
+    import io
+    document=Document();document.add_paragraph('Venue: Main Hall');buffer=io.BytesIO();document.save(buffer)
+    result=extract_attachment(buffer.getvalue(),'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    assert result['status']=='parsed'
+    assert 'Venue: Main Hall' in result['text']
+
+def test_actual_pdf_attachment_text_is_extracted():
+    from app.extraction.attachments import extract_attachment
+    from pypdf import PdfWriter
+    from pypdf.generic import DictionaryObject,NameObject,DecodedStreamObject
+    import io
+    writer=PdfWriter();page=writer.add_blank_page(width=612,height=792)
+    font=DictionaryObject({NameObject('/Type'):NameObject('/Font'),NameObject('/Subtype'):NameObject('/Type1'),NameObject('/BaseFont'):NameObject('/Helvetica')})
+    page[NameObject('/Resources')]=DictionaryObject({NameObject('/Font'):DictionaryObject({NameObject('/F1'):writer._add_object(font)})})
+    stream=DecodedStreamObject();stream.set_data(b'BT /F1 12 Tf 72 720 Td (Venue: Main Hall) Tj ET')
+    page[NameObject('/Contents')]=writer._add_object(stream)
+    buffer=io.BytesIO();writer.write(buffer)
+    result=extract_attachment(buffer.getvalue(),'application/pdf')
+    assert result['status']=='parsed'
+    assert 'Venue: Main Hall' in result['text']
+
 def test_extraction_provider_standard_template():
     from app.extraction.provider import ExtractionProvider
     from app.models import Message
@@ -52,7 +76,7 @@ Video Gear: 1 LED Wall Display, 2 Cameras
 Contact Person: Dr. John (9876543210)
 Special Notes: Live streaming on YouTube required.
 """
-    msg = Message(subject="Media Requirement for Chapel", body=body, sender="studentaffairs@karunya.edu.in")
+    msg = Message(subject="[MEDIA REQUEST] Chapel", body=body, sender="studentaffairs@karunya.edu.in")
     res = provider.analyze(msg)
 
     assert res.classification == 'request'
@@ -120,6 +144,8 @@ def test_extraction_provider_multiline_and_date_variations():
     provider = ExtractionProvider()
 
     body = """Event Name: National Science Conference
+Department / Organizer: Science Department
+Setup Deadline: 13:00
 Venue: Silver Jubilee Hall
 Date: 25 Nov 2026
 Event Time: 14:00
@@ -130,7 +156,7 @@ Video Requirements:
 * Projector: 1
 * 2 High-def Cameras
 """
-    msg = Message(subject="Re: Conference", body=body, sender="prof@karunya.edu.in")
+    msg = Message(subject="Re: [MEDIA REQUEST] Conference", body=body, sender="prof@karunya.edu.in")
     res = provider.analyze(msg)
 
     assert res.classification == 'request'
@@ -139,25 +165,16 @@ Video Requirements:
     assert ev.event_start.day == 25
     assert ev.event_start.month == 11
     assert ev.event_start.hour == 14
-    # Default setup deadline is 1 hour before event_start if not specified
+    # Explicit setup deadline is preserved
     assert ev.setup_deadline.hour == 13
     assert len(ev.requirements) == 4
 
-def test_extraction_provider_media_tagged_incomplete_creates_review():
+def test_extraction_provider_tag_without_template_is_excluded():
     from app.extraction.provider import ExtractionProvider
-    from app.models import Message
-    provider = ExtractionProvider()
+    result = ExtractionProvider().analyze(Message(subject='[MEDIA REQUEST] Guest Lecture', body='Please arrange microphones tomorrow.'))
+    assert result.classification == 'irrelevant'
+    assert result.events == []
 
-    body = "Hi team, we will need some mics for tomorrow's guest lecture at the hall. Let us know if available."
-    msg = Message(subject="[MEDIA REQUEST] Guest Lecture mic query", body=body, sender="guest@karunya.edu.in")
-    res = provider.analyze(msg)
-
-    assert res.classification == 'request'
-    assert len(res.events) == 1
-    ev = res.events[0]
-    assert ev.status == 'needs_review'
-    assert 'Guest Lecture mic query' in ev.title
-    assert len(res.review_reasons) > 0
 
 def test_extraction_provider_generic_circular_classified_irrelevant():
     from app.extraction.provider import ExtractionProvider

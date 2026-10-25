@@ -46,6 +46,8 @@ npm test
 ```
 
 ### 3. Detailed Guides
-- **Setup & Google OAuth**: Read [docs/SETUP.md](file:///mnt/win-newvol/Projects/GitHub/media-app/docs/SETUP.md).
-- **Deployment & EAS Builds**: Read [docs/DEPLOYMENT.md](file:///mnt/win-newvol/Projects/GitHub/media-app/docs/DEPLOYMENT.md).
-- **Quality & Verification**: Read [docs/VALIDATION.md](file:///mnt/win-newvol/Projects/GitHub/media-app/docs/VALIDATION.md).
+- **Setup & Google OAuth**: Read [docs/SETUP.md](docs/SETUP.md).
+- **Deployment**: Read [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- **Current verification and launch gates**: Read [docs/RELEASE-READINESS.md](docs/RELEASE-READINESS.md).
+- **Mail, review and runtime safeguards**: Read [docs/PRODUCTION-HARDENING.md](docs/PRODUCTION-HARDENING.md).
+- **Native builds and signing**: Read [mobile/RELEASE.md](mobile/RELEASE.md).

@@ -7,10 +7,16 @@ export class ApiClient {
   this.transport = transport ? (...args) => transport(...args) : (...args) => globalThis.fetch(...args);
  }
  async setSession(value:Tokens|null){this.tokens=value;await this.persist(value)}
+ private async send(input:RequestInfo|URL,init:RequestInit,timeoutMs=20000){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{return await this.transport(input,{...init,signal:controller.signal})}
+  catch(error){throw new ApiError(controller.signal.aborted?'Request timed out. Check your connection and retry.':'Unable to reach the server. Check your connection.',0)}
+  finally{clearTimeout(timer)}
+ }
  private async refresh(){
   if(!this.refreshing){this.refreshing=(async()=>{
    try{
-    const r=await this.transport(this.base+'/api/v1/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:this.tokens?.refresh_token})});
+    const r=await this.send(this.base+'/api/v1/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:this.tokens?.refresh_token})});
     if(!r.ok){if(r.status===401){await this.setSession(null);throw new ApiError('Sign in again to continue',401)}throw new ApiError('Sign-in service unavailable. Try again.',r.status)}
     await this.setSession(await r.json());
    }finally{this.refreshing=null}
@@ -19,9 +25,11 @@ export class ApiClient {
  }
  async request<T>(path:string,method='GET',body?:unknown,retry=true):Promise<T>{
   const token=this.tokens?.access_token;
-  const r=await this.transport(this.base+'/api/v1'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+  const timeoutMs=['/auth/start','/mailbox/connect'].includes(path)?90000:20000;
+  const r=await this.send(this.base+'/api/v1'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})},timeoutMs);
   if(r.status===401&&retry&&this.tokens){if(token===this.tokens.access_token)await this.refresh();return this.request(path,method,body,false)}
-  const data=await r.json();
+  let data:any;
+  try{data=await r.json()}catch{throw new ApiError('The server returned an unexpected response. Please retry.',r.ok?502:r.status)}
   if(!r.ok){if(r.status===401)await this.setSession(null);throw new ApiError(data.error?.message|| (Array.isArray(data.detail)?data.detail.map((x:any)=>x.msg).join('. '):data.detail)||'Unable to complete this action',r.status)}
   return data;
  }

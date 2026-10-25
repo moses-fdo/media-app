@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import Settings from '../src/app/(tabs)/settings';
 import { ThemeProvider } from '../src/theme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn().mockResolvedValue(true) }));
 
 jest.mock('expo-router', () => ({
   router: {
@@ -25,6 +26,8 @@ let mockMe: any = {
 };
 
 const mockLogout = jest.fn();
+const mockRestart = jest.fn().mockResolvedValue(undefined);
+jest.mock('../src/setup/context', () => ({ useSetup: () => ({ restart: mockRestart }) }));
 
 jest.mock('../src/auth/context', () => {
   const actual = jest.requireActual('../src/auth/context');
@@ -79,7 +82,7 @@ test('renders user profile, mailbox status, and admin controls for admin', async
   await renderWithClient(<Settings />);
 
   expect(screen.getByText('Alex Rivera')).toBeTruthy();
-  expect(screen.getByText('Administrator')).toBeTruthy();
+  expect(screen.getByText(/Media Ops · Administrator/)).toBeTruthy();
   expect(screen.getByText('alex@example.edu')).toBeTruthy();
   expect(screen.getByText('Excluded Email Recovery')).toBeTruthy();
   expect(screen.getByText('Delete Stored Workspace Data')).toBeTruthy();
@@ -100,7 +103,7 @@ test('hides admin controls for standard staff member', async () => {
   await renderWithClient(<Settings />);
 
   expect(screen.getByText('Jordan Lee')).toBeTruthy();
-  expect(screen.getByText('Staff')).toBeTruthy();
+  expect(screen.getByText(/Media Ops · Staff/)).toBeTruthy();
   expect(screen.queryByText('Excluded Email Recovery')).toBeNull();
   expect(screen.queryByText('Delete Stored Workspace Data')).toBeNull();
 });
@@ -129,3 +132,19 @@ test('renders template settings screen with copy and share options', async () =>
   expect(getByText('Field Reference & Supported Formats')).toBeTruthy();
 });
 
+test('copy template writes the actual template to the clipboard', async () => {
+  const { default: TemplateSettings, BLANK_MEDIA_REQUEST_TEMPLATE } = require('../src/app/settings/template');
+  const Clipboard = require('expo-clipboard');
+  await renderWithClient(<TemplateSettings />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Copy blank template' }));
+  expect(Clipboard.setStringAsync).toHaveBeenCalledWith(BLANK_MEDIA_REQUEST_TEMPLATE);
+  expect(screen.getByText('Copied!')).toBeTruthy();
+});
+
+
+
+test('setup can be replayed from Settings', async () => {
+  await renderWithClient(<Settings />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Replay setup' }));
+  expect(mockRestart).toHaveBeenCalled();
+});

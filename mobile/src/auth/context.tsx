@@ -1,25 +1,26 @@
 import React,{createContext,useContext,useEffect,useState} from 'react';
-import {Platform} from 'react-native';
+import {Platform,AppState} from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
-import {QueryClient} from '@tanstack/react-query';
+import {QueryClient,useQuery,focusManager} from '@tanstack/react-query';
 import {ApiClient} from '../api/client';
 import {Tokens,Me} from '../api/types';
 import {clearWorkspaceCache} from './cache';
+import {widgetPublisher} from '../widgets/native';
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:1,staleTime:30000},mutations:{retry:false}}});
 const key='media-ops-session';
 const store={
   async get(){
     if(Platform.OS==='web'){
-      try{return sessionStorage.getItem(key)||localStorage.getItem(key);}catch{return null;}
+      try{const saved=sessionStorage.getItem(key)||localStorage.getItem(key);localStorage.removeItem(key);if(saved)sessionStorage.setItem(key,saved);return saved;}catch{return null;}
     }
     return SecureStore.getItemAsync(key);
   },
   async set(v:Tokens|null){
     if(Platform.OS==='web'){
       try{
-        if(v){const s=JSON.stringify(v);sessionStorage.setItem(key,s);localStorage.setItem(key,s);}
+        if(v){const s=JSON.stringify(v);sessionStorage.setItem(key,s);localStorage.removeItem(key);}
         else{sessionStorage.removeItem(key);localStorage.removeItem(key);}
       }catch{}
     }else{
@@ -29,8 +30,8 @@ const store={
 };
 const base=process.env.EXPO_PUBLIC_API_URL||'http://localhost:8000';
 let onSession:((v:Tokens|null)=>void)|null=null;
-export const api=new ApiClient(base,async v=>{await store.set(v);if(!v){queryClient.clear();await clearWorkspaceCache();}onSession?.(v)});
-const Context=createContext<{ready:boolean;tokens:Tokens|null;me:Me|null;authError:string|null;login:(demo?:boolean)=>Promise<void>;logout:()=>Promise<void>;connectMailbox:()=>Promise<void>}>({ready:false,tokens:null,me:null,authError:null,login:async()=>{},logout:async()=>{},connectMailbox:async()=>{}});
+export const api=new ApiClient(base,async v=>{await store.set(v);if(!v){widgetPublisher.clear();queryClient.clear();await clearWorkspaceCache();}onSession?.(v)});
+const Context=createContext<{ready:boolean;profileLoading:boolean;tokens:Tokens|null;me:Me|null;authError:string|null;login:()=>Promise<void>;logout:()=>Promise<void>;connectMailbox:()=>Promise<void>}>({ready:false,profileLoading:false,tokens:null,me:null,authError:null,login:async()=>{},logout:async()=>{},connectMailbox:async()=>{}});
 WebBrowser.maybeCompleteAuthSession();
 
 export async function saveOAuthVerifier(verifier: string, intent: string = 'auth') {
@@ -109,7 +110,13 @@ async function googleFlow(path:string){
 }
 
 export function AuthProvider({children}:{children:React.ReactNode}){
-  const [tokens,setTokens]=useState<Tokens|null>(null),[ready,setReady]=useState(false),[me,setMe]=useState<Me|null>(null),[authError,setAuthError]=useState<string|null>(null);
+  useEffect(()=>{
+    if(Platform.OS==='web')return;
+    focusManager.setFocused(AppState.currentState!=='background'&&AppState.currentState!=='inactive');
+    const subscription=AppState.addEventListener('change',state=>focusManager.setFocused(state==='active'));
+    return ()=>subscription.remove();
+  },[]);
+  const [tokens,setTokens]=useState<Tokens|null>(null),[ready,setReady]=useState(false),[authError,setAuthError]=useState<string|null>(null);
 
   useEffect(()=>{
     onSession=setTokens;
@@ -168,11 +175,9 @@ export function AuthProvider({children}:{children:React.ReactNode}){
     return ()=>{active=false;onSession=null;};
   },[]);
 
-  useEffect(()=>{
-    if(tokens)api.get<Me>('/me').then(setMe).catch(()=>setMe(null));
-    else setMe(null);
-  },[tokens]);
+  const profile=useQuery({queryKey:['me'],queryFn:()=>api.get<Me>('/me'),enabled:ready&&!!tokens});
+  const me=tokens?(profile.data||null):null;
 
-  return <Context.Provider value={{ready,tokens,me,authError,login:async demo=>{if(demo)await api.setSession(await api.post<Tokens>('/auth/demo'));else await googleFlow('/auth/start')},logout:async()=>{try{const {unregisterCurrentDevice}=await import('../notifications');await unregisterCurrentDevice();await api.post('/auth/logout')}finally{await api.setSession(null)}},connectMailbox:async()=>{await googleFlow('/mailbox/connect');await queryClient.invalidateQueries()}}}>{children}</Context.Provider>;
+  return <Context.Provider value={{ready,profileLoading:!!tokens&&profile.isPending,tokens,me,authError:authError||(profile.error instanceof Error?profile.error.message:null),login:async()=>{setAuthError(null);await googleFlow('/auth/start')},logout:async()=>{try{const {unregisterCurrentDevice}=await import('../notifications');await unregisterCurrentDevice();await api.post('/auth/logout')}finally{await api.setSession(null)}},connectMailbox:async()=>{await googleFlow('/mailbox/connect');await queryClient.invalidateQueries()}}}>{children}</Context.Provider>;
 }
 export const useAuth=()=>useContext(Context);

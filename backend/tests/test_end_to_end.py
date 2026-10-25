@@ -111,7 +111,7 @@ def test_full_pipeline_end_to_end(tmp_path):
             r_db = db.get(RequestRecord, req_id)
             from copy import deepcopy
             d = deepcopy(r_db.data)
-            new_deadline = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+            new_deadline = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
             d['proposed_updates'] = [{
                 'id': 'prop-1',
                 'source_id': msg.id,

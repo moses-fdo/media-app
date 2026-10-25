@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, Pressable, Platform, Share, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Copy, Check, Share2, FileText, CheckCircle2, Info, Sparkles } from 'lucide-react-native';
 import { useTheme } from '../../theme';
+import * as Clipboard from 'expo-clipboard';
 import { Label, Button } from '../../components/ui';
 
 export const STANDARD_MEDIA_REQUEST_TEMPLATE = `Email Subject: [MEDIA REQUEST] Morning Chapel Service
@@ -43,37 +44,16 @@ export default function TemplateSettings() {
 
   async function handleCopy(text: string, setCopied: (v: boolean) => void) {
     let success = false;
-    if (Platform.OS === 'web') {
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(text);
-          success = true;
-        } else {
-          const el = document.createElement('textarea');
-          el.value = text;
-          document.body.appendChild(el);
-          el.select();
-          document.execCommand('copy');
-          document.body.removeChild(el);
-          success = true;
-        }
-      } catch (err) {
-        success = false;
-      }
-    } else {
-      try {
-        await Share.share({ message: text });
-        success = true;
-      } catch {
-        success = false;
-      }
+    try {
+      await Clipboard.setStringAsync(text);
+      success = true;
+    } catch {
+      Alert.alert('Unable to copy', 'Clipboard access was unavailable. Use Share to send the template instead.');
     }
 
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } else {
-      Alert.alert('Copy Template', text);
     }
   }
 
@@ -102,40 +82,35 @@ export default function TemplateSettings() {
       {/* Intro Banner */}
       <View
         style={{
-          padding: 16,
-          backgroundColor: c.blueSoft,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: c.blue,
+          paddingVertical: 12,
+                minHeight: 48,
           gap: 8,
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Sparkles size={20} color={c.blue} />
-          <Label bold size={16} style={{ color: c.blue }}>
+          <Label bold size={16} style={{ color: c.ink, flex: 1 }}>
             Automated Request Extraction
           </Label>
         </View>
         <Label size={13} style={{ color: c.ink, lineHeight: 19 }}>
-          Share this standard format with organizers and departments. When requesters send emails using this format, the app instantly extracts equipment lists, venues, setup deadlines, and dates deterministically without delays.
+          Share this standard format with organizers and departments. The app reads the labelled fields and prepares a request for your team. Missing or conflicting details require review; reminders start after staff confirmation.
         </Label>
       </View>
 
       {/* Blank Reusable Template */}
       <View
         style={{
-          backgroundColor: c.surface,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: c.line,
-          padding: 18,
+          paddingVertical: 22,
+          borderTopWidth: 1,
+          borderTopColor: c.line,
           gap: 14,
         }}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ alignItems: 'flex-start', gap: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <FileText size={20} color={c.blue} />
-            <Label bold size={16}>Standard Template (Fill-in)</Label>
+            <Label bold size={16} style={{ flex: 1 }}>Standard Template (Fill-in)</Label>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
@@ -147,7 +122,8 @@ export default function TemplateSettings() {
                 alignItems: 'center',
                 gap: 5,
                 paddingHorizontal: 10,
-                paddingVertical: 6,
+                paddingVertical: 12,
+                minHeight: 48,
                 borderRadius: 8,
                 backgroundColor: c.input,
               }}
@@ -164,7 +140,8 @@ export default function TemplateSettings() {
                 alignItems: 'center',
                 gap: 5,
                 paddingHorizontal: 12,
-                paddingVertical: 6,
+                paddingVertical: 12,
+                minHeight: 48,
                 borderRadius: 8,
                 backgroundColor: copiedBlank ? c.greenSoft : c.blue,
               }}
@@ -176,8 +153,8 @@ export default function TemplateSettings() {
                 </>
               ) : (
                 <>
-                  <Copy size={15} color="#fff" />
-                  <Label size={12} bold style={{ color: '#fff' }}>Copy</Label>
+                  <Copy size={15} color={c.onAccent} />
+                  <Label size={12} bold style={{ color: c.onAccent }}>Copy</Label>
                 </>
               )}
             </Pressable>
@@ -186,10 +163,8 @@ export default function TemplateSettings() {
 
         <View
           style={{
-            backgroundColor: c.bg,
+            backgroundColor: c.surfaceSubtle,
             borderRadius: 10,
-            borderWidth: 1,
-            borderColor: c.line,
             padding: 14,
           }}
         >
@@ -209,23 +184,21 @@ export default function TemplateSettings() {
       {/* Field Guidelines */}
       <View
         style={{
-          backgroundColor: c.surface,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: c.line,
-          padding: 18,
+          paddingVertical: 22,
+          borderTopWidth: 1,
+          borderTopColor: c.line,
           gap: 14,
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Info size={18} color={c.blue} />
-          <Label bold size={16}>Field Reference & Supported Formats</Label>
+          <Label bold size={16} style={{ flex: 1 }}>Field Reference & Supported Formats</Label>
         </View>
 
         <View style={{ gap: 10 }}>
           <View style={{ gap: 3 }}>
             <Label bold size={13}>Email Subject: [MEDIA REQUEST]</Label>
-            <Label size={12} muted>Always include [MEDIA REQUEST] in the subject line (e.g., "[MEDIA REQUEST] Youth Summit"). This ensures the app immediately identifies the email, while automatically ignoring newsletters, campus circulars, and job alerts.</Label>
+            <Label size={12} muted>Always include [MEDIA REQUEST] in the subject line (e.g., "[MEDIA REQUEST] Youth Summit"). This helps identify the request. Staff can recover excluded messages from Settings if a request was missed.</Label>
           </View>
           <View style={{ height: 1, backgroundColor: c.line }} />
 
@@ -243,7 +216,7 @@ export default function TemplateSettings() {
 
           <View style={{ gap: 3 }}>
             <Label bold size={13}>Event Time & Setup Deadline</Label>
-            <Label size={12} muted>Supports 12-hour (10:00 AM) or 24-hour (14:30) formats. If Setup Deadline is omitted, it defaults to 1 hour prior to event start.</Label>
+            <Label size={12} muted>Supports 12-hour (10:00 AM) or 24-hour (14:30) formats. Missing event times are never guessed. If setup time is omitted, a one-hour-before suggestion requires staff confirmation.</Label>
           </View>
           <View style={{ height: 1, backgroundColor: c.line }} />
 
@@ -254,8 +227,8 @@ export default function TemplateSettings() {
           <View style={{ height: 1, backgroundColor: c.line }} />
 
           <View style={{ gap: 3 }}>
-            <Label bold size={13}>Unformatted Emails</Label>
-            <Label size={12} muted>If a requester sends a casual email without the template, the app flags it as "Needs Review" so staff can verify and confirm details manually.</Label>
+            <Label bold size={13}>Strict Template Enforcement</Label>
+            <Label size={12} muted>Only emails matching the standard media request template are imported. Unformatted emails, general circulars, newsletters, and announcements are automatically excluded from the queue.</Label>
           </View>
         </View>
       </View>
@@ -263,15 +236,13 @@ export default function TemplateSettings() {
       {/* Sample Complete Request */}
       <View
         style={{
-          backgroundColor: c.surface,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: c.line,
-          padding: 18,
+          paddingVertical: 22,
+          borderTopWidth: 1,
+          borderTopColor: c.line,
           gap: 14,
         }}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ alignItems: 'flex-start', gap: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <CheckCircle2 size={18} color={c.green} />
             <Label bold size={16}>Completed Example</Label>
@@ -285,7 +256,8 @@ export default function TemplateSettings() {
               alignItems: 'center',
               gap: 5,
               paddingHorizontal: 12,
-              paddingVertical: 6,
+              paddingVertical: 12,
+                minHeight: 48,
               borderRadius: 8,
               backgroundColor: copiedSample ? c.greenSoft : c.input,
             }}
@@ -306,10 +278,8 @@ export default function TemplateSettings() {
 
         <View
           style={{
-            backgroundColor: c.bg,
+            backgroundColor: c.surfaceSubtle,
             borderRadius: 10,
-            borderWidth: 1,
-            borderColor: c.line,
             padding: 14,
           }}
         >

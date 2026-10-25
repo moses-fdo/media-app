@@ -1,4 +1,4 @@
-BASE={'title':'Annual Convocation','timezone':'Asia/Kolkata','event_start':'2026-10-25T10:00:00+05:30','setup_deadline':'2026-10-25T08:00:00+05:30','requirements':[{'title':'Wireless mics','department':'audio','quantity':4}]}
+BASE={'title':'Annual Convocation','venue':'Main Auditorium','timezone':'Asia/Kolkata','event_start':'2026-10-25T10:00:00+05:30','setup_deadline':'2026-10-25T08:00:00+05:30','requirements':[{'title':'Wireless mics','department':'audio','quantity':4}]}
 
 def test_request_edit_states_versions_and_isolation(app,client,auth):
     from app.auth.sessions import issue_session

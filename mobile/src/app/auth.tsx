@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -31,7 +31,7 @@ export default function AuthCallback() {
       const code = params.code;
       if (!code) {
         if (mounted) {
-          router.replace('/(tabs)');
+          router.replace(api.tokens ? '/(tabs)' : '/sign-in');
         }
         return;
       }
@@ -48,6 +48,7 @@ export default function AuthCallback() {
             return;
           }
         }
+        if (!api.tokens) throw new Error('This sign-in attempt expired. Return to sign-in and try again.');
         if (mounted) {
           router.replace('/(tabs)');
         }

@@ -9,18 +9,21 @@ from google.oauth2 import id_token
 from google.auth.transport.requests import Request as GoogleRequest
 from cryptography.fernet import Fernet
 from .sessions import get_session, require_member, require_admin, digest, issue_session
-from ..models import SessionToken, OAuthState, Member, Workspace, Mailbox
+from ..models import SessionToken, OAuthState, Member, Workspace, Mailbox, Device
 router=APIRouter(prefix='/api/v1')
-class Refresh(BaseModel): refresh_token: str
+class Refresh(BaseModel): refresh_token: str=Field(min_length=1,max_length=256)
 class Start(BaseModel):
     challenge: str=Field(min_length=43,max_length=128,pattern=r'^[A-Za-z0-9_-]+$')
     redirect_uri: str|None=None
-class Exchange(BaseModel): code: str; verifier: str
+class Exchange(BaseModel):
+    code: str=Field(min_length=1,max_length=256)
+    verifier: str=Field(min_length=43,max_length=128,pattern=r'^[A-Za-z0-9._~-]+$')
 
 def challenge(value): return base64.urlsafe_b64encode(hashlib.sha256(value.encode()).digest()).decode().rstrip('=')
 
 def oauth_start(request, body, db, member=None):
     c=request.app.state.settings
+    if not c.valid_client_redirect(body.redirect_uri): raise HTTPException(400,'Use an approved app redirect URL')
     if not c.google_client_id or not c.google_client_secret: raise HTTPException(503,'Configure Google OAuth before connecting')
     if member and not c.encryption_key: raise HTTPException(503,'Configure mailbox encryption key first')
     state=secrets.token_urlsafe(32); verifier=secrets.token_urlsafe(48)
@@ -84,8 +87,8 @@ def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(ge
         box=db.scalar(select(Mailbox).where(Mailbox.workspace_id==member.workspace_id))
         if box and box.email!=identity['email']:
             if custom_redirect:
-                return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':'Disconnect the existing mailbox before connecting another'})}")
-            raise HTTPException(409,'Disconnect the existing mailbox before connecting another')
+                return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':'This workspace is linked to a different Gmail account. Reconnect its original account.'})}")
+            raise HTTPException(409,'This workspace is linked to a different Gmail account. Reconnect its original account.')
         if not box: box=Mailbox(workspace_id=member.workspace_id,email=identity['email']);db.add(box)
         box.encrypted_token=Fernet(c.encryption_key.encode()).encrypt(tokens['refresh_token'].encode()).decode();box.status='connected';box.error=None
     else:
@@ -125,13 +128,14 @@ def refresh(body:Refresh,db=Depends(get_session)):
     if token.revoked:
         db.execute(update(SessionToken).where(SessionToken.family==token.family).values(revoked=True));db.commit();raise HTTPException(401,'Session reuse detected. Sign in again.')
     member=db.get(Member,token.member_id)
-    if token.expires<time.time() or not member.active: raise HTTPException(401,'Session expired')
+    if token.expires<time.time() or not member or not member.active: raise HTTPException(401,'Session expired')
     claimed=db.execute(update(SessionToken).where(SessionToken.token_hash==token.token_hash,SessionToken.revoked==False).values(revoked=True))
     if claimed.rowcount!=1: raise HTTPException(401,'Session already refreshed')
     result=issue_session(db,member.id,token.family);db.commit();return result
 @router.post('/auth/logout')
 def logout(member=Depends(require_member),db=Depends(get_session)):
-    db.execute(update(SessionToken).where(SessionToken.member_id==member.id).values(revoked=True));db.commit();return {'ok':True}
+    db.execute(update(SessionToken).where(SessionToken.member_id==member.id).values(revoked=True))
+    db.execute(update(Device).where(Device.member_id==member.id).values(active=False));db.commit();return {'ok':True}
 @router.get('/me')
 def me(request:Request,member=Depends(require_member),db=Depends(get_session)):
     w=db.get(Workspace,member.workspace_id)
@@ -147,6 +151,8 @@ def add_member(body:MemberInput,request:Request,member=Depends(require_admin),db
     if c.allowed_domain and not body.email.lower().endswith(f"@{c.allowed_domain.lower()}"):
         raise HTTPException(400,f"Staff emails must be within @{c.allowed_domain}")
     existing=db.scalar(select(Member).where(Member.email==body.email.lower()))
+    if existing and existing.workspace_id==member.workspace_id and not existing.active:
+        existing.active=True;existing.role=body.role;existing.name=body.name;db.commit();return {'ok':True}
     if existing: raise HTTPException(409,'That staff account already exists')
     db.add(Member(workspace_id=member.workspace_id,**{**body.model_dump(),'email':body.email.lower()}));db.commit();return {'ok':True}
 @router.delete('/workspace/members/{id}')
@@ -154,4 +160,6 @@ def remove_member(id:str,member=Depends(require_admin),db=Depends(get_session)):
     target=db.get(Member,id)
     if not target or target.workspace_id!=member.workspace_id: raise HTTPException(404,'Staff member not found')
     if target.id==member.id: raise HTTPException(400,'You cannot remove your own access')
-    target.active=False;db.commit();return {'ok':True}
+    target.active=False
+    db.execute(update(SessionToken).where(SessionToken.member_id==target.id).values(revoked=True))
+    db.execute(update(Device).where(Device.member_id==target.id).values(active=False));db.commit();return {'ok':True}

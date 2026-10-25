@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from .models import uid
 Status=Literal['needs_review','new','in_progress','confirmed','completed','cancelled','dismissed']
 class Requirement(BaseModel):
@@ -13,6 +13,9 @@ class Requirement(BaseModel):
     assignee_id:str|None=None
     status:Literal['pending','prepared','tested']='pending'
     version:int=1
+    @field_validator('title',mode='before')
+    @classmethod
+    def trim_title(cls,value):return value.strip() if isinstance(value,str) else value
 class RequestCreate(BaseModel):
     title:str=Field(min_length=1,max_length=250)
     organizer:str=Field(default='',max_length=500)
@@ -26,6 +29,18 @@ class RequestCreate(BaseModel):
     priority:Literal['low','medium','high']='medium'
     status:Status='new'
     requirements:list[Requirement]=Field(default_factory=list,max_length=100)
+    @field_validator('title','venue','organizer','contact',mode='before')
+    @classmethod
+    def trim_text(cls,value):return value.strip() if isinstance(value,str) else value
+    @model_validator(mode='after')
+    def schedule_order(self):
+        if len({item.id for item in self.requirements}) != len(self.requirements):
+            raise ValueError('Equipment items must have unique IDs')
+        if self.event_start and self.setup_deadline and self.setup_deadline > self.event_start:
+            raise ValueError('Setup deadline must be at or before the event start')
+        if self.event_start and self.event_end and self.event_end <= self.event_start:
+            raise ValueError('Event end must be after the event start')
+        return self
     @field_validator('timezone')
     @classmethod
     def zone(cls,v):

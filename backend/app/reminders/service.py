@@ -5,7 +5,7 @@ from ..models import Reminder, Member
 def schedule_request_reminders(db,record):
     data=record.data;revision=data.get('deadline_revision',1)
     db.execute(update(Reminder).where(Reminder.request_id==record.id,Reminder.status=='pending').values(status='cancelled'))
-    if data['status'] in ('needs_review','completed','cancelled','dismissed') or not data.get('setup_deadline'): return
+    if data['status'] not in ('confirmed','in_progress') or not data.get('setup_deadline'): return
     deadline=datetime.fromisoformat(data['setup_deadline'])
     for member in db.scalars(select(Member).where(Member.workspace_id==record.workspace_id,Member.active==True)):
         for offset in member.preferences.get('offsets',[1440,60]):

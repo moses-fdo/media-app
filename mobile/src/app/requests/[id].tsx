@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ScrollView,
   View,
-  Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -16,24 +15,26 @@ import {
   MapPin,
   Clock3,
   Pencil,
-  Headphones,
-  Video,
-  Layers,
   CalendarDays,
-  CheckCircle2,
   AlertTriangle,
   User,
 } from 'lucide-react-native';
-import { api, queryClient } from '../../auth/context';
-import { MediaRequest } from '../../api/types';
-import { layout, radius, spacing, useTheme } from '../../theme';
-import { Label, Button, ErrorNote, AnimatedPressable, StatusBadge } from '../../components/ui';
+import { useQuery } from '@tanstack/react-query';
+import { api, queryClient, useAuth } from '../../auth/context';
+import { MediaRequest, Member } from '../../api/types';
+import { layout, radius, useTheme } from '../../theme';
+import { Label, Button, ErrorNote, AnimatedPressable } from '../../components/ui';
 import { useCachedQuery } from '../../features/requests/useCachedQuery';
 import { dateLabel, clock, statusLabel } from '../../features/requests/presentation';
 import { RequestForm } from '../../features/requests/RequestForm';
+import { ProposalChanges } from '../../features/requests/ProposalChanges';
+import { EquipmentList } from '../../features/requests/EquipmentList';
 
 export default function Detail() {
   const insets = useSafeAreaInsets();
+  const editScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const editOffset = useRef(0);
+  const { me } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors: c } = useTheme();
   const query = useCachedQuery<MediaRequest>('request:' + id, () => api.get('/requests/' + id));
@@ -43,6 +44,7 @@ export default function Detail() {
   const [busy, setBusy] = useState(false);
 
   const r = query.data;
+  const assigned = useQuery({ queryKey: ['staff'], queryFn: () => api.get<{ items: Member[] }>('/workspace/members'), enabled: !!r?.requirements.some(item => item.assignee_id) });
 
   async function patch(data: any) {
     if (!r) return;
@@ -53,7 +55,7 @@ export default function Detail() {
         expected_version: r.version,
         ...data,
       });
-      queryClient.setQueryData([undefined, 'request:' + id], result);
+      queryClient.setQueryData([me?.workspace_id, 'request:' + id], result);
       await queryClient.invalidateQueries();
       await query.refetch();
     } catch (e) {
@@ -112,6 +114,12 @@ export default function Detail() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={editScroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+          onScroll={event => { editOffset.current = event.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
           contentContainerStyle={{
             paddingHorizontal: layout.gutter,
             paddingTop: 20,
@@ -130,6 +138,8 @@ export default function Detail() {
             </Label>
           </View>
           <RequestForm
+            onReload={async () => { await query.refetch({ throwOnError: true }); setError(null); setEditing(false); }}
+            onInvalid={pageY => editScroll.current?.scrollTo({ y: Math.max(0, editOffset.current + pageY - 140), animated: false })}
             initial={r}
             timezone={r.timezone}
             onSave={async (data) => {
@@ -156,13 +166,6 @@ export default function Detail() {
       ? c.amber
       : c.blue;
 
-  const toneBg =
-    r.status === 'completed'
-      ? c.greenSoft
-      : r.status === 'needs_review'
-      ? c.amberSoft
-      : c.blueSoft;
-
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
@@ -178,11 +181,7 @@ export default function Detail() {
         {/* Header & Status */}
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <StatusBadge
-              label={statusLabel(r.status)}
-              tone={tone}
-              bgTone={toneBg}
-            />
+            <Label size={14} style={{ color: tone }}>{statusLabel(r.status)}</Label>
             <AnimatedPressable
               accessibilityRole="button"
               accessibilityLabel="Edit request"
@@ -193,8 +192,9 @@ export default function Detail() {
                 alignItems: 'center',
                 gap: 6,
                 paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: radius.full,
+                minHeight: 48,
+                paddingVertical: 10,
+                borderRadius: radius.md,
                 backgroundColor: c.surfaceSubtle,
                 borderWidth: 1,
                 borderColor: c.line,
@@ -207,7 +207,7 @@ export default function Detail() {
             </AnimatedPressable>
           </View>
 
-          <Label size={30} bold style={{ lineHeight: 36, letterSpacing: -0.9, color: c.ink }}>
+          <Label size={32} bold style={{ lineHeight: 39, letterSpacing: -0.8, color: c.ink }}>
             {r.title}
           </Label>
 
@@ -217,11 +217,7 @@ export default function Detail() {
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              backgroundColor: c.surface,
-              padding: 12,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: c.line,
+              paddingVertical: 8,
             }}
           >
             <User size={18} color={c.blue} />
@@ -238,11 +234,7 @@ export default function Detail() {
           {/* Venue & Timing Card */}
           <View
             style={{
-              backgroundColor: c.surface,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: c.line,
-              padding: 14,
+              paddingVertical: 14,
               gap: 10,
             }}
           >
@@ -257,7 +249,7 @@ export default function Detail() {
 
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <CalendarDays size={18} color={c.muted} />
-              <Label size={14} muted style={{ flex: 1 }}>
+              <Label size={16} bold style={{ flex: 1 }}>
                 {dateLabel(r.event_start, r.timezone)}
                 {r.event_start ? ' · ' + clock(r.event_start, r.timezone) : ''}
               </Label>
@@ -267,22 +259,21 @@ export default function Detail() {
           {/* Setup Deadline Banner */}
           <View
             style={{
-              backgroundColor: overdue ? c.redSoft : c.blueSoft,
+              backgroundColor: overdue ? c.redSoft : c.amberSoft,
               padding: 16,
               borderRadius: radius.lg,
               flexDirection: 'row',
               gap: 12,
               alignItems: 'center',
-              borderWidth: 1.5,
-              borderColor: overdue ? c.red : c.blue,
+
             }}
           >
-            <Clock3 color={overdue ? c.red : c.blue} size={24} />
+            <Clock3 color={overdue ? c.red : c.amber} size={24} />
             <View style={{ flex: 1, gap: 2 }}>
-              <Label size={12} bold style={{ color: overdue ? c.red : c.blue }}>
-                {overdue ? 'SETUP OVERDUE' : 'SETUP DEADLINE'}
+              <Label size={12} bold style={{ color: overdue ? c.red : c.amber }}>
+                {overdue ? 'Setup overdue' : 'Setup deadline'}
               </Label>
-              <Label bold size={16} style={{ color: overdue ? c.red : c.ink }}>
+              <Label bold size={16} style={{ color: overdue ? c.red : c.amber }}>
                 {r.setup_deadline
                   ? dateLabel(r.setup_deadline, r.timezone) +
                     ' · ' +
@@ -295,11 +286,7 @@ export default function Detail() {
           {r.summary ? (
             <View
               style={{
-                backgroundColor: c.surface,
-                padding: 14,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: c.line,
+                paddingVertical: 14,
               }}
             >
               <Label size={12} muted style={{ marginBottom: 4 }}>
@@ -314,7 +301,7 @@ export default function Detail() {
               Offline · Changes will require an active internet connection
             </Label>
           )}
-          <ErrorNote error={error} />
+
 
           {r.review_reasons.map((reason) => (
             <View
@@ -355,26 +342,16 @@ export default function Detail() {
             <Label bold size={16} style={{ color: c.amber }}>
               New updates received from email
             </Label>
-            {Object.entries(p.changes)
-              .filter(([k]) =>
-                ['title', 'venue', 'event_start', 'setup_deadline', 'summary'].includes(k)
-              )
-              .map(([k, v]) => (
-                <View key={k}>
-                  <Label size={12} muted>
-                    {k.replaceAll('_', ' ')}
-                  </Label>
-                  <Label bold>
-                    {String((r as any)[k] || 'Unspecified')} → {String(v || 'Unspecified')}
-                  </Label>
-                </View>
-              ))}
+            <ProposalChanges request={r} changes={p.changes} />
+            {p.review_reasons?.map(reason => <Label key={reason} size={13} style={{ color: c.amber }}>{reason}</Label>)}
+            {p.source_id && <Button title="Read update email" quiet onPress={() => router.push({ pathname: '/source', params: { id: p.source_id } })} />}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
               <View style={{ flex: 1 }}>
                 <Button
                   title="Accept update"
                   disabled={busy}
                   onPress={async () => {
+                    setBusy(true);setError(null);
                     try {
                       await api.post(`/requests/${id}/proposals/${p.id}/accept`, {
                         expected_version: r.version,
@@ -383,15 +360,17 @@ export default function Detail() {
                       await queryClient.invalidateQueries();
                     } catch (e) {
                       setError(e);
-                    }
+                    } finally { setBusy(false); }
                   }}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
                   title="Dismiss"
+                  disabled={busy}
                   quiet
                   onPress={async () => {
+                    setBusy(true);setError(null);
                     try {
                       await api.post(`/requests/${id}/proposals/${p.id}/dismiss`, {
                         expected_version: r.version,
@@ -400,7 +379,7 @@ export default function Detail() {
                       await queryClient.invalidateQueries();
                     } catch (e) {
                       setError(e);
-                    }
+                    } finally { setBusy(false); }
                   }}
                 />
               </View>
@@ -408,123 +387,24 @@ export default function Detail() {
           </View>
         ))}
 
-        {/* Clean Equipment List Section */}
-        <View style={{ marginTop: 28, gap: 14 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Label bold size={20}>
-              Equipment Checklist
-            </Label>
-            <Label size={13} muted>
-              {r.requirements.length} {r.requirements.length === 1 ? 'item' : 'items'}
-            </Label>
+        <EquipmentList requirements={r.requirements} />
+
+        {r.requirements.some(item => item.assignee_id) && <View style={{ marginTop: 28, gap: 14 }}>
+          <Label size={21} bold accessibilityRole="header">Assigned staff</Label>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            {Array.from(new Set(r.requirements.map(item => item.assignee_id).filter(Boolean))).map(memberId => {
+              const name = assigned.data?.items.find(member => member.id === memberId)?.name || 'Team member';
+              return <View key={memberId!} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.blueSoft, alignItems: 'center', justifyContent: 'center' }}><Label size={12} style={{ color: c.blue }}>{name.split(' ').slice(0, 2).map(part => part[0]).join('')}</Label></View>
+                <Label size={14}>{name}</Label>
+              </View>;
+            })}
           </View>
-
-          {['audio', 'video', 'other'].map((dept) => {
-            const items = r.requirements.filter((x) => x.department === dept);
-            if (!items.length) return null;
-            return (
-              <View
-                key={dept}
-                style={{
-                  backgroundColor: c.surface,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: c.line,
-                  padding: 16,
-                  gap: 12,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 9,
-                    paddingBottom: 10,
-                    borderBottomWidth: 1,
-                    borderBottomColor: c.line,
-                  }}
-                >
-                  {dept === 'audio' ? (
-                    <Headphones size={20} color={c.blue} />
-                  ) : dept === 'video' ? (
-                    <Video size={20} color={c.blue} />
-                  ) : (
-                    <Layers size={20} color={c.blue} />
-                  )}
-                  <Label bold size={16} style={{ color: c.ink }}>
-                    {dept === 'audio'
-                      ? 'Audio Gear'
-                      : dept === 'video'
-                      ? 'Video Gear'
-                      : 'Other Equipment'}
-                  </Label>
-                </View>
-
-                <View style={{ gap: 8 }}>
-                  {items.map((item) => (
-                    <View
-                      key={item.id}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 10,
-                        paddingVertical: 5,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: c.blue,
-                        }}
-                      />
-                      {item.quantity ? (
-                        <View
-                          style={{
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: radius.sm,
-                            backgroundColor: c.blueSoft,
-                          }}
-                        >
-                          <Label bold size={13} style={{ color: c.blue }}>
-                            {item.quantity}×
-                          </Label>
-                        </View>
-                      ) : null}
-                      <Label size={15} style={{ color: c.ink, flex: 1 }}>
-                        {item.title}
-                      </Label>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          })}
-
-          {!r.requirements.length && (
-            <View
-              style={{
-                padding: 18,
-                backgroundColor: c.surface,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: c.line,
-              }}
-            >
-              <Label muted size={14}>
-                No equipment items specified yet. Tap Edit to add items.
-              </Label>
-            </View>
-          )}
-        </View>
+        </View>}
 
         {/* Source Emails & Actions */}
         <View style={{ gap: 12, marginTop: 28 }}>
-          <Label bold size={18}>
-            Source Context
-          </Label>
+          <Label bold size={21} accessibilityRole="header">Source emails</Label>
           {r.sources.map((s, i) => (
             <AnimatedPressable
               key={s}
@@ -539,11 +419,7 @@ export default function Detail() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                backgroundColor: c.surface,
-                paddingHorizontal: 16,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: c.line,
+                paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line,
               }}
             >
               <Mail size={18} color={c.blue} />
@@ -554,6 +430,7 @@ export default function Detail() {
             </AnimatedPressable>
           ))}
 
+          {!done && <Button title="Cancel event" quiet danger disabled={busy} onPress={() => Alert.alert('Cancel event?', 'Future reminders will be cancelled. The request and source emails will stay available.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Cancel event', style: 'destructive', onPress: () => act({ status: 'cancelled' }) }])} />}
           <Button
             title="Dismiss as not a media request"
             quiet
@@ -583,23 +460,27 @@ export default function Detail() {
             alignSelf: 'center',
           }}
         >
-          {r.status === 'needs_review' ? (
+          <ErrorNote error={error} />
+          {!!r.proposed_updates.length && <Label muted size={13} style={{ marginBottom: 8 }}>Accept or dismiss pending email updates before continuing.</Label>}
+          {['needs_review', 'new'].includes(r.status) ? (
             <Button
               title="Confirm request"
+              disabled={!!r.proposed_updates.length}
               busy={busy}
               onPress={() => act({ status: 'confirmed' })}
             />
           ) : (
             <Button
               title={
-                r.status === 'completed'
+                done
                   ? 'Reopen request'
                   : 'Mark request completed'
               }
+              disabled={!!r.proposed_updates.length}
               busy={busy}
               onPress={() =>
                 act({
-                  status: r.status === 'completed' ? 'in_progress' : 'completed',
+                  status: done ? 'in_progress' : 'completed',
                 })
               }
             />

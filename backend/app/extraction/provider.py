@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from .schemas import AnalysisResult
 from ..schemas import RequestCreate, Requirement
@@ -24,223 +24,229 @@ for k, aliases in HEADERS_MAP.items():
         ALL_KEYS.append((a, k))
 ALL_KEYS.sort(key=lambda x: -len(x[0]))
 
-IRRELEVANT_PATTERNS = [
-    r'\bunsubscribe\b', r'\bnewsletter\b', r'\bmailer-daemon\b',
-    r'\bautomated response\b', r'\bout of office\b', r'\bnotification only\b',
-    r'\bno-reply@\b', r'\bdonotreply@\b'
-]
+def parse_time_str(value):
+    match = re.search(r'(?<![\d:])(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?![\w:])', value or '', re.I)
+    if not match or (not match[2] and not match[3]):
+        return None
+    hour, minute, meridian = int(match[1]), int(match[2] or 0), match[3]
+    if minute > 59 or (meridian and not 1 <= hour <= 12) or (not meridian and hour > 23):
+        return None
+    if meridian:
+        hour = hour % 12 + (12 if meridian.lower() == 'pm' else 0)
+    return hour, minute
 
-def parse_time_str(s: str) -> tuple[int, int] | None:
-    if not s: return None
-    m = re.search(r'(\d{1,2}):(\d{2})\s*(am|pm)?', s, re.IGNORECASE)
-    if not m: return None
-    h, mn, mer = int(m.group(1)), int(m.group(2)), m.group(3)
-    if mer:
-        mer = mer.lower()
-        if mer == 'pm' and h < 12: h += 12
-        elif mer == 'am' and h == 12: h = 0
-    if 0 <= h <= 23 and 0 <= mn <= 59: return h, mn
-    return None
 
-def parse_date_str(s: str) -> tuple[int, int, int] | None:
-    if not s: return None
-    m = re.search(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})', s)
-    if m: return int(m.group(1)), int(m.group(2)), int(m.group(3))
-    m = re.search(r'(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})', s)
-    if m: return int(m.group(3)), int(m.group(2)), int(m.group(1))
-    months = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
-    m = re.search(r'(\d{1,2})\s+([a-zA-Z]{3,9})\s+(\d{4})', s)
-    if m:
-        mo = months.get(m.group(2)[:3].lower())
-        if mo: return int(m.group(3)), mo, int(m.group(1))
-    return None
-
-def parse_gear_items(raw: str, dept: str) -> list[Requirement]:
-    items = []
-    lines = re.split(r'[\n,]+', raw)
-    for line in lines:
-        cleaned = re.sub(r'^[\s\-*•]+', '', line)
-        cleaned = re.sub(r'^\s*\d+[\.)]\s+', '', cleaned).strip()
-        if not cleaned: continue
-        qty = 1
-        m = re.match(r'^(\d+)\s*(?:x\s*)?(.+)', cleaned, re.IGNORECASE)
-        if m:
-            qty = int(m.group(1))
-            name = m.group(2).strip()
+def parse_date_str(value):
+    value = value or ''
+    parts = None
+    match = re.search(r'(?<!\d)(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?!\d)', value)
+    if match:
+        parts = tuple(map(int, match.groups()))
+    else:
+        match = re.search(r'(?<!\d)(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?!\d)', value)
+        if match:
+            parts = int(match[3]), int(match[2]), int(match[1])
         else:
-            m = re.match(r'^(.+?)\s*[:(x]\s*(\d+)\s*\)?$', cleaned, re.IGNORECASE)
-            if m:
-                name = m.group(1).strip()
-                qty = int(m.group(2))
-            else:
-                name = cleaned
+            match = re.search(r'(\d{1,2})\s+([a-zA-Z]{3,9})\s+(\d{4})', value)
+            months = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
+            if match and match[2][:3].lower() in months:
+                parts = int(match[3]), months[match[2][:3].lower()], int(match[1])
+    if parts:
+        try:
+            date(*parts)
+            return parts
+        except ValueError:
+            pass
+    return None
+
+
+def parse_gear_items(raw, department, issues=None):
+    issues = issues if issues is not None else []
+    items = []
+    for line in re.split(r'[\n,;]+', raw):
+        cleaned = re.sub(r'^\s*(?:[-*•]\s+)+', '', line).strip()
+        cleaned = re.sub(r'^\d+[.)]\s+', '', cleaned).strip()
+        if not cleaned:
+            continue
+        quantity = None
+        leading = re.match(r'^(-?\d+)\s*(?:[x×]\s*)?(.+)$', cleaned, re.I)
+        trailing = re.match(r'^(.+?)\s*(?:[:x×]|\()\s*(\d+)\s*\)?$', cleaned, re.I)
+        if leading:
+            quantity, name = int(leading[1]), leading[2].strip()
+        elif trailing:
+            name, quantity = trailing[1].strip(), int(trailing[2])
+        else:
+            name = cleaned
+        if quantity is not None and not 0 < quantity <= 100000:
+            issues.append('Invalid equipment quantity; verify the equipment list.')
+            quantity = None
         if len(name) >= 2:
-            items.append(Requirement(title=name[:200], quantity=qty, department=dept))
+            items.append(Requirement(title=name[:200], quantity=quantity, department=department))
+        if len(items) == 100:
+            issues.append('Equipment list was truncated; review the original email.')
+            break
     return items
 
-def parse_template_sections(text: str) -> dict[str, str]:
-    sections = {}
-    current_key = None
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
+
+def current_message_text(text):
+    lines = []
+    for line in (text or '').splitlines():
+        stripped = line.strip()
+        if re.match(r'^(?:On .+wrote:|-----Original Message-----|--)$', stripped, re.I):
+            break
+        if not stripped.startswith('>'):
+            lines.append(line)
+    return '\n'.join(lines)
+
+
+def parse_template_sections(text):
+    sections, current = {}, None
+    for raw in current_message_text(text).splitlines():
+        line = raw.strip()
         if not line or (line.startswith('[') and line.endswith(']')):
             continue
-        matched_key = None
-        rest_val = ''
+        matched = False
         for alias, key in ALL_KEYS:
-            pattern = r'^(?:[-*•]\s*)?' + re.escape(alias) + r'\s*[:=-]\s*(.*)$'
-            m = re.match(pattern, line, re.IGNORECASE)
-            if m:
-                matched_key = key
-                rest_val = m.group(1).strip()
+            match = re.match(r'^(?:[-*•]\s*)?' + re.escape(alias) + r'\s*[:=]\s*(.*)$', line, re.I)
+            if match:
+                # Preserve distinct values for ambiguity detection; never select one silently.
+                value = match[1].strip()
+                sections[key] = sections[key] + '\n' + value if key in sections and value != sections[key] else value
+                current, matched = key, True
                 break
-        if matched_key:
-            current_key = matched_key
-            if rest_val:
-                sections[current_key] = sections.get(current_key, '') + ('\n' if current_key in sections else '') + rest_val
-        elif current_key:
-            sections[current_key] = sections.get(current_key, '') + '\n' + line
+        if not matched and current in ('audio', 'video', 'other_gear', 'notes'):
+            if re.match(r'^(thanks|thank you|regards|sincerely|unsubscribe)\b', line, re.I):
+                current = None
+            else:
+                sections[current] += '\n' + line
     return sections
 
-NON_MEDIA_SUBJECT_PATTERNS = [
-    r'\bcircular\b',
-    r'\budemy\b',
-    r'\bfellowship\b',
-    r'\bhackathon\b',
-    r'\bawareness\s*pledge\b',
-    r'\bstudent\s*representatives\b',
-    r'\belection\b',
-    r'\bfeedback\s*form\b',
-    r'\bjob\s*alert\b',
-    r'\bcongratulations\b',
-    r'\bcondolence\b',
-    r'\bwebinar\b',
-    r'\bcourse\s*access\b',
-    r'\bcall\s*for\s*applications\b',
-    r'\bquantumania\b',
-    r'\bastras?\b',
-]
 
-MEDIA_SUBJECT_PATTERNS = [
-    r'\[media\s*request\]',
-    r'\[media\]',
-    r'\bmedia\s*request\b',
-    r'\bmedia\s*requirement[s]?\b',
-]
+def has_template_subject(subject):
+    subject = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', (subject or '').strip(), flags=re.I)
+    match = re.match(r'^\[media\s+request\]\s*(.+)$', subject, re.I)
+    return bool(match and match[1].strip() and not re.fullmatch(r'<[^>]+>', match[1].strip()))
 
-def has_media_subject(subject: str) -> bool:
-    if not subject:
-        return False
-    for pat in MEDIA_SUBJECT_PATTERNS:
-        if re.search(pat, subject, re.IGNORECASE):
-            return True
-    return False
+
+def matches_template_fields(subject, sections):
+    required = ('organizer', 'venue', 'date', 'start_time', 'setup_deadline')
+    return has_template_subject(subject) and all(sections.get(key, '').strip() for key in required) and any(sections.get(key, '').strip() for key in ('audio', 'video', 'other_gear'))
+
+
+def matches_media_template(message):
+    sections = {}
+    sources = [message.body or ''] + [item.get('text', '') for item in (message.attachments or []) if item.get('status') == 'parsed']
+    for text in sources:
+        for key, value in parse_template_sections(text[:100000]).items():
+            if key not in sections or not sections[key]:
+                sections[key] = value
+    return matches_template_fields(message.subject, sections)
+
 
 class ExtractionProvider:
     def __init__(self, settings=None):
-        self.settings = settings
-        self.tz_name = getattr(settings, 'workspace_timezone', 'Asia/Kolkata') if settings else 'Asia/Kolkata'
+        self.tz_name = getattr(settings, 'workspace_timezone', 'Asia/Kolkata')
 
-    def analyze(self, message) -> AnalysisResult:
-        body = (message.body or '').strip()
+    def analyze(self, message):
         subject = (message.subject or '').strip()
-        full_text = f"{subject}\n{body}"
-
-        if not body and not subject:
-            return AnalysisResult(classification='irrelevant', events=[])
-        for pat in IRRELEVANT_PATTERNS:
-            if re.search(pat, full_text, re.IGNORECASE):
-                return AnalysisResult(classification='irrelevant', events=[])
-
-        is_media_subject = has_media_subject(subject)
-
-        # Discard generic university circulars, academic notices, and non-media alerts unless explicit media request in subject
-        if not is_media_subject:
-            for pat in NON_MEDIA_SUBJECT_PATTERNS:
-                if re.search(pat, subject, re.IGNORECASE):
-                    return AnalysisResult(classification='irrelevant', events=[])
-
-        sections = parse_template_sections(body)
-        if not sections:
-            sections = parse_template_sections(full_text)
-
-        # Parse gear requirements
-        reqs: list[Requirement] = []
-        if 'audio' in sections:
-            reqs.extend(parse_gear_items(sections['audio'], 'audio'))
-        if 'video' in sections:
-            reqs.extend(parse_gear_items(sections['video'], 'video'))
-        if 'other_gear' in sections:
-            reqs.extend(parse_gear_items(sections['other_gear'], 'other'))
-
-        venue = sections.get('venue') or ''
-        date_parts = parse_date_str(sections.get('date', ''))
-        start_parts = parse_time_str(sections.get('start_time', ''))
-        setup_parts = parse_time_str(sections.get('setup_deadline', ''))
-
-        # STRICT MEDIA CRITERIA:
-        # 1. If subject explicitly has [MEDIA REQUEST], accept it (staff will review if gear is missing)
-        # 2. If subject does NOT have [MEDIA REQUEST], it MUST have parsed gear requirements (reqs > 0)
-        # Emails without [MEDIA REQUEST] and without gear requirements are 100% IRRELEVANT.
-        if not is_media_subject:
-            if len(reqs) == 0:
-                return AnalysisResult(classification='irrelevant', events=[])
-            if not venue and not date_parts:
-                return AnalysisResult(classification='irrelevant', events=[])
-
-        # It is confirmed as a media request email
-        title = sections.get('title') or subject or 'Untitled Media Request'
-        # Clean title if subject had [MEDIA REQUEST] prefix
-        clean_title = (re.sub(r'^\s*\[?(?:media\s*request|media)\]?\s*[:-]?\s*', '', title, flags=re.IGNORECASE).strip() or title or 'Untitled Media Request')
-        organizer = sections.get('organizer') or getattr(message, 'sender', '') or 'Media Requester'
-        venue = sections.get('venue') or ''
-        contact = sections.get('contact') or ''
-        notes = sections.get('notes') or ''
-
+        body = current_message_text(message.body or '')
+        attachments = [a.get('text', '') for a in (message.attachments or []) if a.get('status') == 'parsed']
+        sources = [body] + attachments
+        sections, issues = {}, []
+        for text in sources:
+            parsed = parse_template_sections(text[:100000])
+            for key, value in parsed.items():
+                if key in sections and sections[key] and value and sections[key] != value:
+                    issues.append('Conflicting ' + key.replace('_', ' ') + ' fields; review the original sources.')
+                elif value or key not in sections:
+                    sections[key] = value
+        for key, value in sections.items():
+            if key not in ('audio', 'video', 'other_gear', 'notes') and '\n' in value:
+                issues.append('Multiple ' + key.replace('_', ' ') + ' values; separate events need separate requests.')
+        full_text = (subject + '\n' + '\n'.join(sources))[:200000]
+        followup = bool(getattr(message, 'related_request', False))
+        templated = matches_template_fields(subject, sections)
+        # A subject tag or a mention of AV equipment is not a request template.
+        # Partial, structured replies are accepted only after the service links
+        # the thread to an existing request; they must never create a new event.
+        structured_reply = followup and has_template_subject(subject) and any(sections.get(key, '').strip() for key in ('venue', 'date', 'start_time', 'setup_deadline', 'audio', 'video', 'other_gear', 'contact'))
+        if not templated and not structured_reply:
+            return AnalysisResult(classification='irrelevant')
+        unstructured = not any(sections.get(key) for key in ('date', 'venue', 'audio', 'video', 'other_gear', 'start_time'))
+        if unstructured:
+            issues.append('Unstructured request; verify dates, venue and equipment against the source.')
+        requirements = []
+        for key, department in [('audio', 'audio'), ('video', 'video'), ('other_gear', 'other')]:
+            requirements.extend(parse_gear_items(sections.get(key, ''), department, issues))
+        if len(requirements) > 100:
+            requirements = requirements[:100]
+            issues.append('Equipment list was truncated; review the original email.')
+        if any(item.quantity is None for item in requirements):
+            issues.append('Confirm equipment quantities before confirming this request.')
+        raw_title = sections.get('title') or subject or 'Media request needs review'
+        clean_title = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', raw_title, flags=re.I)
+        clean_title = re.sub(r'^\s*\[?(?:media\s*request|media)\]?\s*[:-]?\s*', '', clean_title, flags=re.I).strip() or raw_title
+        payload = {'title': clean_title[:250], 'timezone': self.tz_name}
+        fields, parts = [], {}
+        for key in ('title', 'organizer', 'venue', 'contact', 'notes'):
+            value = sections.get(key, '')
+            if value:
+                target = 'summary' if key == 'notes' else key
+                limit = 5000 if target == 'summary' else 250 if target == 'title' else 500
+                payload[target] = value[:limit]
+                fields.append(target)
+        if requirements:
+            payload['requirements'] = requirements
+            fields.append('requirements')
+        if not payload.get('organizer'):
+            payload['organizer'] = (getattr(message, 'sender', '') or 'Media requester')[:500]
+        if not payload.get('summary'):
+            payload['summary'] = (body[:5000] if unstructured else 'Media request for ' + clean_title)[:5000]
         tz = ZoneInfo(self.tz_name)
-        event_start = None
-        setup_deadline = None
-        review_reasons = []
-
+        date_parts = parse_date_str(sections.get('date', ''))
+        start = parse_time_str(sections.get('start_time', ''))
+        setup = parse_time_str(sections.get('setup_deadline', ''))
         if date_parts:
-            y, m, d = date_parts
-            if start_parts:
-                sh, sm = start_parts
-                event_start = datetime(y, m, d, sh, sm, tzinfo=tz)
-            else:
-                event_start = datetime(y, m, d, 9, 0, tzinfo=tz)
-
-            if setup_parts:
-                dh, dm = setup_parts
-                setup_deadline = datetime(y, m, d, dh, dm, tzinfo=tz)
-            elif event_start:
-                setup_deadline = event_start - timedelta(hours=1)
-        else:
-            review_reasons.append('Event date not specified or could not be parsed.')
-
-        if not reqs:
-            review_reasons.append('Audio / Video equipment requirements not specified.')
-        if not venue:
-            review_reasons.append('Event venue not specified.')
-
-        is_complete = bool(event_start and reqs and venue)
-        event = RequestCreate(
-            title=clean_title[:250],
-            organizer=organizer[:500],
-            venue=venue[:500],
-            contact=contact[:500],
-            summary=notes[:5000] or f"Media request for {clean_title} at {venue or 'designated venue'}",
-            event_start=event_start,
-            setup_deadline=setup_deadline,
-            timezone=self.tz_name,
-            requirements=reqs,
-            status='new' if is_complete else 'needs_review'
-        )
-
+            parts['date'] = date(*date_parts).isoformat()
+        elif sections.get('date'):
+            issues.append('Invalid event date; enter a valid calendar date.')
+        for key, value, label in [('start_time', start, 'event time'), ('setup_deadline', setup, 'setup time')]:
+            if sections.get(key) and not value:
+                issues.append('Invalid ' + label + '; enter an explicit time.')
+        if start:
+            parts['start_time'] = f'{start[0]:02}:{start[1]:02}'
+        if setup:
+            parts['setup_time'] = f'{setup[0]:02}:{setup[1]:02}'
+        if date_parts and start:
+            payload['event_start'] = datetime(*date_parts, *start, tzinfo=tz)
+            fields.append('event_start')
+        if date_parts and setup:
+            payload['setup_deadline'] = datetime(*date_parts, *setup, tzinfo=tz)
+            fields.append('setup_deadline')
+        elif payload.get('event_start') and not sections.get('setup_deadline'):
+            payload['setup_deadline'] = payload['event_start'] - timedelta(hours=1)
+            # This suggestion is review-only and is not applied to a partial follow-up.
+            issues.append('Setup deadline suggested one hour before the event; confirm it before enabling reminders.')
+        if payload.get('event_start') and payload.get('setup_deadline') and payload['setup_deadline'] > payload['event_start']:
+            payload.pop('setup_deadline')
+            fields = [key for key in fields if key != 'setup_deadline']
+            issues.append('Setup deadline is after the event; correct the schedule.')
+        reasons = list(issues)
+        if not payload.get('event_start'):
+            reasons.append('Confirm event date and time.')
+        if not payload.get('setup_deadline'):
+            reasons.append('Confirm setup deadline.')
+        if not payload.get('venue'):
+            reasons.append('Confirm event venue.')
+        if not requirements:
+            reasons.append('Confirm equipment requirements.')
+        payload['status'] = 'needs_review' if reasons else 'new'
         return AnalysisResult(
-            classification='request',
-            events=[event],
-            review_reasons=review_reasons,
-            source_excerpts=[body[:300]] if body else []
+            classification='update' if followup else 'request',
+            events=[RequestCreate(**payload)],
+            review_reasons=list(dict.fromkeys(reasons)),
+            update_review_reasons=list(dict.fromkeys(issues)),
+            event_fields=[list(dict.fromkeys(fields))],
+            schedule_parts=[parts],
+            source_excerpts=[full_text[:500]],
         )
-

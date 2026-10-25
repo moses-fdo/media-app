@@ -3,13 +3,15 @@ from sqlalchemy import select, update
 from fastapi import HTTPException
 from ..models import RequestRecord, Member, now, uid
 from ..schemas import RequestCreate
+from .validation import required_review_reasons
 
 def output(record):
     data=deepcopy(record.data)
     data['requirements_summary']=' · '.join((f"{r['quantity']} " if r.get('quantity') else '')+r['title'] for r in data.get('requirements',[])[:3])
     return {**data,'id':record.id,'version':record.version}
-def owned(db,id,workspace):
-    record=db.get(RequestRecord,id)
+def owned(db,id,workspace,lock=False):
+    query=select(RequestRecord).where(RequestRecord.id==id,RequestRecord.workspace_id==workspace)
+    record=db.scalar(query.with_for_update() if lock else query)
     if not record or record.workspace_id!=workspace: raise HTTPException(404,'Request not found')
     return record
 
@@ -23,7 +25,7 @@ def create_request(db,workspace,data,actor='Email processing',sources=None,revie
     payload=RequestCreate.model_validate(data).model_dump(mode='json')
     validate_assignees(db,payload,workspace)
     reasons=list(review_reasons or [])
-    if not payload['event_start'] or not payload['setup_deadline']: reasons.append('Confirm event date and setup deadline')
+    reasons.extend(required_review_reasons(payload))
     if reasons: payload['status']='needs_review'
     payload.update(sources=sources or [],proposed_updates=[],review_reasons=list(dict.fromkeys(reasons)),activity=[{'at':now(),'actor':actor,'action':'Request created'}],manual_fields=[],deadline_revision=1)
     record=RequestRecord(workspace_id=workspace,data=payload);db.add(record);db.flush();return record

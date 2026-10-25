@@ -1,15 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Text,
   View,
   Pressable,
   TextInput,
-  StyleSheet,
   ActivityIndicator,
   TextInputProps,
   Animated,
+  AccessibilityInfo,
+  Modal,
+  ScrollView,
   ViewStyle,
-  TextStyle,
   PressableProps,
 } from 'react-native';
 import { useTheme, radius, spacing } from '../theme';
@@ -32,7 +33,7 @@ export function Label({
           fontSize: size,
           lineHeight: Math.round(size * 1.42),
           color: muted ? c.muted : c.ink,
-          fontWeight: bold ? '600' : '400',
+          fontWeight: bold ? '700' : '400',
           letterSpacing: size >= 27 ? -0.7 : size <= 12 ? 0.2 : 0,
         },
         style,
@@ -41,6 +42,17 @@ export function Label({
       {children}
     </Text>
   );
+}
+
+export function useReducedMotion() {
+  const [reduced, setReduced] = useState(true);
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) setReduced(value); }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
+    return () => { active = false; subscription.remove(); };
+  }, []);
+  return reduced;
 }
 
 export function AnimatedPressable({
@@ -56,9 +68,11 @@ export function AnimatedPressable({
   style?: any;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const reduced = useReducedMotion();
+  useEffect(() => { if (reduced) { scale.stopAnimation(); scale.setValue(1); } }, [reduced, scale]);
 
   const handlePressIn = () => {
-    if (disabled) return;
+    if (disabled || reduced) return;
     Animated.spring(scale, {
       toValue: activeScale,
       useNativeDriver: true,
@@ -68,6 +82,7 @@ export function AnimatedPressable({
   };
 
   const handlePressOut = () => {
+    if (reduced) return;
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
@@ -139,6 +154,8 @@ export function Button({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={title}
+      aria-disabled={disabled || busy}
+      aria-busy={busy}
       accessibilityState={{ disabled: disabled || busy, busy }}
       disabled={disabled || busy}
       onPress={onPress}
@@ -182,12 +199,13 @@ export function Button({
   );
 }
 
-export function Field({
+export const Field = React.forwardRef<React.ComponentRef<typeof TextInput>, TextInputProps & { label: string; helper?: string; error?: string }>(function Field({
   label,
   helper,
+  error,
   style,
   ...props
-}: TextInputProps & { label: string; helper?: string }) {
+}, ref) {
   const { colors: c } = useTheme();
   const [focused, setFocused] = useState(false);
 
@@ -197,6 +215,9 @@ export function Field({
         {label}
       </Label>
       <TextInput
+        ref={ref}
+        aria-invalid={!!error}
+        accessibilityHint={error || helper}
         accessibilityLabel={label}
         placeholderTextColor={c.muted}
         onFocus={() => setFocused(true)}
@@ -205,14 +226,14 @@ export function Field({
         style={[
           {
             minHeight: 48,
-            backgroundColor: c.input,
+            backgroundColor: c.surface,
             borderRadius: radius.md,
             paddingHorizontal: 14,
             paddingVertical: 12,
             fontSize: 16,
             color: c.ink,
-            borderWidth: 1.5,
-            borderColor: focused ? c.blue : c.line,
+            borderWidth: 1,
+            borderColor: error ? c.red : focused ? c.blue : c.inputBorder,
           },
           props.multiline && {
             minHeight: 96,
@@ -221,80 +242,15 @@ export function Field({
           style,
         ]}
       />
-      {helper && (
+      {!!error && <Label size={13} style={{ color: c.red }} accessibilityLiveRegion="polite">{error}</Label>}
+      {helper && !error && (
         <Label size={12} muted style={{ marginTop: 2 }}>
           {helper}
         </Label>
       )}
     </View>
   );
-}
-
-export function StatusBadge({
-  label,
-  tone,
-  bgTone,
-  showDot = true,
-}: {
-  label: string;
-  tone: string;
-  bgTone: string;
-  showDot?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        backgroundColor: bgTone,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: radius.full,
-      }}
-    >
-      {showDot && (
-        <View
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: tone,
-          }}
-        />
-      )}
-      <Label size={12} bold style={{ color: tone }}>
-        {label}
-      </Label>
-    </View>
-  );
-}
-
-export function Card({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: ViewStyle;
-}) {
-  const { colors: c } = useTheme();
-  return (
-    <View
-      style={[
-        {
-          backgroundColor: c.card,
-          borderRadius: radius.lg,
-          borderWidth: 1,
-          borderColor: c.cardBorder,
-          padding: spacing.lg,
-        },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
+});
 
 export function ErrorNote({ error }: { error: unknown }) {
   const { colors: c } = useTheme();
@@ -378,10 +334,19 @@ export function Empty({
   );
 }
 
-export const styles = StyleSheet.create({
-  page: { flex: 1 },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  pad: { paddingHorizontal: 20 },
-  stack: { gap: 16 },
-  section: { paddingVertical: 18 },
-});
+
+export type DialogAction = { title: string; onPress: () => void; danger?: boolean };
+export function ActionDialog({ title, message, actions, onCancel }: { title: string; message: string; actions: DialogAction[]; onCancel: () => void }) {
+  const { colors: c } = useTheme();
+  return <Modal transparent visible animationType="none" onRequestClose={onCancel}>
+    <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: c.overlay }}>
+      <View accessibilityViewIsModal aria-modal accessibilityRole="alert" style={{ width: '100%', maxWidth: 480, maxHeight: '90%', alignSelf: 'center', backgroundColor: c.surface, borderRadius: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
+          <Label size={23} bold accessibilityRole="header">{title}</Label><Label size={15} muted>{message}</Label>
+          <Button title="Keep editing" quiet onPress={onCancel} />
+          {actions.map(action => <Button key={action.title} title={action.title} danger={action.danger} onPress={action.onPress} />)}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>;
+}

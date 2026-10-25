@@ -3,7 +3,7 @@ const { runInNewContext } = require('node:vm');
 
 // Config runs in Node before Metro. Avoid Expo's Jest transform inlining public env values.
 const configModule = { exports: {} as any };
-runInNewContext(readFileSync(require('node:path').resolve('app.config.js'), 'utf8'), { module: configModule, require, process });
+runInNewContext(readFileSync(require('node:path').resolve('app.config.js'), 'utf8'), { module: configModule, require, process, __dirname: require('node:path').resolve('.') });
 const configure = configModule.exports;
 
 const original = { ...process.env };

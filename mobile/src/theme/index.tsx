@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
 
 const light = {
@@ -19,7 +20,7 @@ const light = {
   red: '#AF343D',
   redSoft: '#FCEBEC',
   input: '#EEEFF1',
-  inputBorder: '#D8DCE3',
+  inputBorder: '#858B96',
   onAccent: '#FFFFFF',
   overlay: 'rgba(23, 28, 43, 0.4)',
 };
@@ -42,7 +43,7 @@ const dark: typeof light = {
   red: '#FF9C9C',
   redSoft: '#40262A',
   input: '#272C35',
-  inputBorder: '#3C4452',
+  inputBorder: '#758094',
   onAccent: '#16191E',
   overlay: 'rgba(0, 0, 0, 0.65)',
 };
@@ -79,14 +80,30 @@ interface ThemeContextType {
 
 const Context = createContext<ThemeContextType>({
   colors: light,
-  mode: 'light',
+  mode: 'system',
   isDark: false,
   setMode: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
-  const [mode, setMode] = useState('light');
+  const [mode, updateMode] = useState('system');
+  const changed = useRef(false);
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem('media-appearance').then(saved => {
+      if (active && !changed.current && ['light', 'dark', 'system'].includes(saved || '')) updateMode(saved!);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const writes = useRef(Promise.resolve());
+  function setMode(value: string) {
+    if (!['light', 'dark', 'system'].includes(value)) return;
+    changed.current = true;
+    updateMode(value);
+    writes.current = writes.current.catch(() => {}).then(() => AsyncStorage.setItem('media-appearance', value));
+    writes.current.catch(() => {});
+  }
   const isDark = mode === 'dark' || (mode === 'system' && system === 'dark');
   const colors = isDark ? dark : light;
 

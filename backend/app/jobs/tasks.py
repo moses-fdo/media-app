@@ -19,19 +19,21 @@ def resources():
 def sync_all():
     c,e,sessions=resources()
     with sessions() as db:
-        for box in db.scalars(select(Mailbox).where(Mailbox.status!='reconnect_required')):sync_one.delay(box.id)
+        for box in db.scalars(select(Mailbox).where(Mailbox.status.in_(['connected','syncing','error']))):sync_one.delay(box.id)
     e.dispose()
-@celery.task(name='media.sync_one',bind=True,max_retries=5)
-def sync_one(self,id,days=30):
-    c,e,sessions=resources();lock=Redis.from_url(c.redis_url).lock('mailbox:'+id,timeout=900,blocking_timeout=0)
+@celery.task(name='media.sync_one',bind=True,max_retries=5,soft_time_limit=840,time_limit=900)
+def sync_one(self,id,days=30,full=False,retry_failed=False):
+    c,e,sessions=resources();lock=Redis.from_url(c.redis_url).lock('mailbox:'+id,timeout=960,blocking_timeout=0)
     if not lock.acquire(blocking=False):e.dispose();return
     try:
         with sessions() as db:
             box=db.get(Mailbox,id)
-            if not box:return
+            if not box or not box.encrypted_token or box.status=='reconnect_required':return
             try:
+                if full:box.history_id=None;db.commit()
                 client=GmailClient(c,box);sync_mailbox(db,box,client,days)
-                for m in db.scalars(select(Message).where(Message.mailbox_id==id,Message.status.in_(['queued','failed'])).limit(100)):extract_one.delay(m.id)
+                states=['queued','failed'] if retry_failed else ['queued']
+                for m in db.scalars(select(Message).where(Message.mailbox_id==id,Message.status.in_(states)).order_by(Message.status.desc(),Message.received_at).limit(100)):extract_one.delay(m.id)
             except ReconnectRequired:
                 box.status='reconnect_required';box.error='Reconnect Gmail to resume synchronization';db.commit()
             except Exception:
@@ -74,5 +76,10 @@ def retention():
     c,e,sessions=resources();cutoff=(datetime.now(timezone.utc)-timedelta(days=c.source_retention_days)).isoformat()
     with sessions() as db:
         for m in db.scalars(select(Message).where(Message.received_at<cutoff,Message.status=='processed')):m.body='Source expired under retention policy';m.attachments=[]
+        from sqlalchemy import delete
+        from ..models import OAuthState,SessionToken
+        import time
+        db.execute(delete(OAuthState).where(OAuthState.expires<time.time()))
+        db.execute(delete(SessionToken).where(SessionToken.expires<time.time()-2592000))
         db.commit()
     e.dispose()

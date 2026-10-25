@@ -16,7 +16,11 @@ def parse_message(raw):
         elif mime=='text/html':
             soup=BeautifulSoup(decode(body.get('data','')),'html.parser')
             for tag in soup(['script','style','iframe','object']):tag.decompose()
-            html.append(soup.get_text(' ',strip=True))
+            for tag in soup.select('blockquote, .gmail_quote'):tag.decompose()
+            # Keep block/line boundaries so HTML templates retain their field labels.
+            for tag in soup.find_all('br'):tag.replace_with('\n')
+            for tag in soup.find_all(['p','div','li','tr']):tag.insert_after('\n')
+            html.append(soup.get_text('',strip=False))
         for child in part.get('parts',[]):visit(child)
     visit(payload)
     return {'subject':headers.get('subject','(No subject)'),'sender':headers.get('from',''),'received_at':datetime.fromtimestamp(int(raw.get('internalDate','0'))/1000,timezone.utc).isoformat(),'body':'\n'.join(plain or html)[:100000],'attachments':attachments}

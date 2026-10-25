@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { api, useAuth, queryClient } from '../../auth/context';
 import { Mailbox } from '../../api/types';
-import { useTheme } from '../../theme';
+import { layout, useTheme } from '../../theme';
 import { Label, Button, ErrorNote } from '../../components/ui';
 
 export default function MailboxSettings() {
@@ -89,20 +89,20 @@ export default function MailboxSettings() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50, gap: 20 }}>
+    <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
       <Label size={26} bold>Mailbox Connection</Label>
       <Label muted size={14}>
-        The media department mailbox receives requests for equipment and AV assistance. Google OAuth tokens are encrypted server-side.
+        The media department mailbox receives requests for equipment and AV assistance. Only authorized staff can connect or manage this account.
       </Label>
 
       {query.isLoading ? (
         <ActivityIndicator color={c.blue} />
       ) : (
         <View style={{ padding: 18, backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.line, gap: 10 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <Label bold size={16}>Status</Label>
             <Label bold style={{ color: m?.status === 'connected' ? c.green : m?.status === 'syncing' ? c.blue : c.amber }}>
-              {m?.status?.toUpperCase() || 'UNKNOWN'}
+              {({connected:'Connected',syncing:'Syncing',error:'Sync needs attention',reconnect_required:'Reconnect needed',disconnected:'Disconnected'} as Record<string,string>)[m?.status || ''] || 'Checking connection'}
             </Label>
           </View>
 
@@ -122,11 +122,12 @@ export default function MailboxSettings() {
         </View>
       )}
 
+      {!!m?.failed && <Label size={14} style={{ color: c.amber }}>{m.failed} messages could not be processed. Sync again to retry, or contact your administrator if the count stays unchanged.</Label>}
       <ErrorNote error={error} />
 
       {isAdmin && (
         <View style={{ gap: 12, marginTop: 10 }}>
-          {m?.status !== 'connected' ? (
+          {!['connected','syncing','error'].includes(m?.status || '') ? (
             <Button
               title="Connect Gmail Account"
               busy={busy}

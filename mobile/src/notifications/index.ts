@@ -6,10 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../auth/context';
 
 const tokenKey = 'media-ops-device-token';
+const configurationMessage = 'Phone notifications are not configured in this app build yet. You can save your reminder timing and continue without them. Ask your administrator for an updated app.';
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === 'web' || !Device.isDevice) return null;
   if (Platform.OS === 'android') {
+    if (!Constants.expoConfig?.extra?.notifications?.androidConfigured) throw new Error(configurationMessage);
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Setup reminders', importance: Notifications.AndroidImportance.HIGH,
     });
@@ -19,7 +21,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
   if (status !== 'granted') return null;
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('Configure the Expo project before enabling notifications.');
-  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+  let token: string;
+  try { ({ data: token } = await Notifications.getExpoPushTokenAsync({ projectId })); }
+  catch (error) {
+    if (error instanceof Error && /Firebase|googleServicesFile/i.test(error.message)) throw new Error(configurationMessage);
+    throw error;
+  }
   await api.post('/devices', { token });
   await AsyncStorage.setItem(tokenKey, token);
   return token;

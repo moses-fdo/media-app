@@ -1,4 +1,3 @@
-import React from 'react';
 import {render,screen,fireEvent} from '@testing-library/react-native';
 import {RequestRow} from '../src/features/requests/RequestRow';
 import {ThemeProvider} from '../src/theme';

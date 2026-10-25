@@ -10,28 +10,50 @@ services:
       test: ["CMD-SHELL", "pg_isready -U media"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
   api:
     build: ../backend
     env_file: ${ENV_FILE:-../backend/.env.production}
     command: sh -c 'alembic upgrade head && uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000'
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
-      redis: {condition: service_started}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready',timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
   worker:
     build: ../backend
     env_file: ${ENV_FILE:-../backend/.env.production}
     command: celery -A app.jobs.celery_app worker --loglevel=info --concurrency=2
-    depends_on: [api]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.jobs.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
   scheduler:
     build: ../backend
     env_file: ${ENV_FILE:-../backend/.env.production}
     command: celery -A app.jobs.celery_app beat --loglevel=info
-    depends_on: [api]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   postgres-data:
   redis-data:

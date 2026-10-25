@@ -2,6 +2,26 @@
 
 The app is Expo / React Native. Run commands from `D:\Projects\GitHub\media-app\mobile` in PowerShell.
 
+## Physical Android phone build
+
+The default Windows build targets the live HTTPS API at `https://media-desk-api.onrender.com`, with demo disabled:
+
+```powershell
+.\scripts\build-android.ps1
+```
+
+On Linux, install locked dependencies with `npm ci`, then run:
+
+```sh
+./scripts/build-android.sh
+```
+
+Set `ANDROID_HOME` if the SDK is outside `~/Android/Sdk`.
+
+Install the newly built `android/app/build/outputs/apk/release/app-release.apk` on the phone. This APK runs without Metro or a computer-hosted backend. An older installed APK keeps its old API address until replaced. Use your approved staff Google account; the Android OAuth return URI is `mediaops://auth`.
+
+This is a directly installable, debug-signed internal build. Store publication still requires the private production signing configuration below. Verify a complete Google sign-in, mailbox connection and notification delivery on the actual phone before distribution.
+
 ## Prerequisites
 
 Install Node.js LTS, Android Studio, and its Android SDK platform, build tools, platform tools, NDK and CMake versions requested by Gradle. Use Android Studio's bundled Java 21 runtime. The build script selects it automatically. It also finds the shared SDK at `D:\Android\Sdk` (the `Android\Sdk` directory on the project drive) before considering environment variables, which avoids stale terminal values and Codex/MSIX AppData redirection.
@@ -28,7 +48,7 @@ To verify SDK/Java detection without installing packages or starting Gradle:
 
 ## Build an installable preview APK locally on Windows
 
-Start the backend with demo enabled for testing. An Android emulator reaches the host computer at `10.0.2.2`; a physical phone needs the computer's LAN IP and a backend listening on `0.0.0.0` with the firewall configured. `localhost` on the phone means the phone itself.
+For local backend testing, start the backend separately. An Android emulator reaches the host computer at `10.0.2.2`; a physical phone needs the computer's LAN IP and a backend listening on `0.0.0.0` with the firewall configured. `localhost` on the phone means the phone itself.
 
 ```powershell
 .\scripts\build-android.ps1 -ApiUrl 'http://10.0.2.2:8000'
@@ -40,7 +60,7 @@ This installs locked dependencies when necessary, runs TypeScript and mobile tes
 D:\Projects\GitHub\media-app\mobile\android\app\build\outputs\apk\release\app-release.apk
 ```
 
-The preview APK bundles JavaScript and runs without Metro. It enables sample requests and uses debug signing, so it is for testing. Install it with:
+The preview APK bundles JavaScript and runs without Metro. It uses debug signing and demo is disabled by default, so it is for internal testing. Install it with:
 
 ```powershell
 & "$env:ANDROID_HOME\platform-tools\adb.exe" install -r .\android\app\build\outputs\apk\release\app-release.apk
@@ -56,7 +76,7 @@ The installer and build helper also update bundled Ninja versions older than 1.1
 
 ## Build a signed production APK locally
 
-Deploy the backend over HTTPS first. Configure real Google OAuth, read-only Gmail access, LLM extraction, PostgreSQL, Redis/Celery, Expo FCM credentials and staff access. Verify the external-service checks in `docs/RELEASE-READINESS.md` before distribution.
+Deploy the backend over HTTPS first. Configure real Google OAuth, read-only Gmail access, PostgreSQL, Redis/Celery, Expo FCM credentials and staff access. Verify the external-service checks in `docs/RELEASE-READINESS.md` before distribution.
 
 Generate and back up a private upload keystore outside the repository. `keytool` asks for its passwords interactively:
 
@@ -84,6 +104,15 @@ Output: `android/app/build/outputs/bundle/release/app-release.aab`. Google Play 
 
 ## Branding
 
-`assets/images/media-ops-mark.png` is the transparent cobalt mark. `media-ops-icon.png` is the opaque launcher icon. `app.config.js` configures the Android adaptive and monochrome icons, iOS icon, web favicon and native splash. Expo Go and web preview cannot verify the native release splash; verify it by cold-launching a release APK on a device.
+`assets/images/karunya-k-mark.png` is the Karunya mark. `karunya-k-icon.png` is the opaque launcher icon. `app.config.js` configures the Android adaptive and monochrome icons, iOS icon, web favicon and native splash. Expo Go and web preview cannot verify the native release splash; verify it by cold-launching a release APK on a device.
 
 Sources: [Expo local builds](https://docs.expo.dev/guides/local-app-overview/), [APK builds](https://docs.expo.dev/build-reference/apk/), [Splash screen](https://docs.expo.dev/versions/latest/sdk/splash-screen/).
+
+
+## Latest internal phone package — 25 October 2026
+
+Version 1.1.0 (2) is available at `../build/karunya-media-desk-1.1.0.apk`. The stable phone APK path also points to it. It includes the intro, Gmail sync setup, widget and UI improvements. See `../docs/PHONE-BUILD.md` for verification, checksum and physical-phone checks still pending. It uses the prior internal debug certificate and is not a store-signed distribution.
+
+## Required Firebase configuration for the next Android build
+
+The 1.1.0 APK exposed missing Firebase initialization when enabling notifications. Android phone builds now require google-services.json for `com.mediaops.staff`, provided at the mobile root or through GOOGLE_SERVICES_JSON. Expo's FCM V1 sender credentials must also be configured privately before delivery can work. See `../docs/ANDROID-PUSH-SETUP.md`. The source has clearer configuration errors and cold-start sign-in handling; these are not yet in a replacement APK.

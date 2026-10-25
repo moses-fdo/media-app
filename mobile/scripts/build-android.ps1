@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)][string]$ApiUrl,
+    [string]$ApiUrl = 'https://media-desk-api.onrender.com',
     [switch]$Production,
     [switch]$EnableDemo,
     [switch]$SkipInstall,
@@ -8,6 +8,7 @@ param(
     [switch]$CheckOnly
 )
 $ErrorActionPreference = 'Stop'
+$env:REQUIRE_ANDROID_PUSH = "true"
 $mobileRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $mobileRoot
 try {
@@ -85,5 +86,5 @@ try {
     $apkPath = Join-Path $mobileRoot 'android/app/build/outputs/apk/release/app-release.apk'
     if (-not (Test-Path -LiteralPath $apkPath)) { throw 'Gradle finished without the expected APK.' }
     Write-Host "APK: $apkPath"
-    if (-not $Production) { Write-Host 'Preview APK: demo enabled; debug signing. Use -Production with your keystore for release.' }
+    if (-not $Production) { Write-Host "Preview APK: demo=$($EnableDemo.IsPresent); debug signing. Use -Production with your keystore for release." }
 } finally { Pop-Location }

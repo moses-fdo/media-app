@@ -4,9 +4,10 @@ from sqlalchemy import select
 from ..auth.sessions import require_member,get_session
 from ..models import Device,RequestRecord,Reminder
 from .service import schedule_request_reminders
+from datetime import datetime,timezone
 router=APIRouter(prefix='/api/v1')
 class Preferences(BaseModel):
-    offsets:list[int]=Field(max_length=10)
+    offsets:list[int]=Field(min_length=1,max_length=10)
     @field_validator('offsets')
     @classmethod
     def valid(cls,v):
@@ -23,6 +24,16 @@ def register(body:Registration,member=Depends(require_member),db=Depends(get_ses
     d=db.scalar(select(Device).where(Device.token==body.token))
     if d:d.member_id=member.id;d.active=True
     else:db.add(Device(member_id=member.id,token=body.token))
+    # If notifications were enabled after an offset passed, recover the most
+    # recent missed reminder per upcoming event rather than sending a burst.
+    stamp=datetime.now(timezone.utc)
+    recovered=set()
+    for job in db.scalars(select(Reminder).where(Reminder.member_id==member.id,Reminder.status=='no_device').order_by(Reminder.due.desc()).limit(100)):
+        record=db.get(RequestRecord,job.request_id)
+        if not record or job.request_id in recovered or job.offset not in member.preferences.get('offsets',[1440,60]):continue
+        data=record.data
+        if data['status'] in ('confirmed','in_progress') and data.get('setup_deadline') and datetime.fromisoformat(data['setup_deadline'])>stamp and data.get('deadline_revision',1)==job.revision:
+            job.status='pending';job.due=stamp.isoformat();job.claimed_at=None;recovered.add(job.request_id)
     db.commit();return {'ok':True}
 @router.delete('/devices')
 def unregister(body:Registration,member=Depends(require_member),db=Depends(get_session)):

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Trash2, Plus } from 'lucide-react-native';
-import { api, useAuth, queryClient } from '../../auth/context';
+import { api, useAuth } from '../../auth/context';
 import { Member } from '../../api/types';
-import { useTheme } from '../../theme';
+import { layout, useTheme } from '../../theme';
 import { Label, Button, Field, ErrorNote } from '../../components/ui';
 
 export default function StaffSettings() {
@@ -80,7 +80,7 @@ export default function StaffSettings() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50, gap: 20 }}>
+    <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: 50, gap: 20, width: '100%', maxWidth: layout.contentWidth, alignSelf: 'center' }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Label size={26} bold>Staff Directory</Label>
         {isAdmin && !adding && (
@@ -88,9 +88,9 @@ export default function StaffSettings() {
             accessibilityRole="button"
             accessibilityLabel="Add staff member"
             onPress={() => setAdding(true)}
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.blue, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 48, height: 48, borderRadius: 10, backgroundColor: c.blue, alignItems: 'center', justifyContent: 'center' }}
           >
-            <Plus size={22} color={c.surface} />
+            <Plus size={22} color={c.onAccent} />
           </Pressable>
         )}
       </View>
@@ -113,10 +113,13 @@ export default function StaffSettings() {
               <Pressable
                 key={r}
                 accessibilityRole="radio"
+                accessibilityLabel={r === 'admin' ? 'Administrator' : 'Staff'}
+                aria-checked={role === r}
                 accessibilityState={{ checked: role === r }}
                 onPress={() => setRole(r)}
                 style={{
                   flex: 1,
+                  minHeight: 48,
                   padding: 12,
                   borderRadius: 8,
                   backgroundColor: role === r ? c.blueSoft : c.input,
@@ -151,11 +154,7 @@ export default function StaffSettings() {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                padding: 14,
-                backgroundColor: c.surface,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: c.line,
+                paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.line,
                 gap: 12,
               }}
             >
@@ -172,7 +171,7 @@ export default function StaffSettings() {
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${m.name}`}
                   onPress={() => handleRemove(m)}
-                  style={{ padding: 10 }}
+                  style={{ minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Trash2 size={18} color={c.red} />
                 </Pressable>

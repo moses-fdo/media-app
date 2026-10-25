@@ -2,11 +2,13 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../auth/context';
+import { useSetup } from '../setup/context';
 
 export function NotificationRouting() {
-  const { tokens } = useAuth();
+  const { tokens, me } = useAuth();
+  const setup = useSetup();
   useEffect(() => {
-    if (!tokens || Platform.OS === 'web') return;
+    if (!tokens || !me || !setup.ready || setup.required || Platform.OS === 'web') return;
     let active = true;
     let subscription: { remove: () => void } | undefined;
     import('expo-notifications').then(async notifications => {
@@ -23,6 +25,6 @@ export function NotificationRouting() {
       open(await notifications.getLastNotificationResponseAsync());
     }).catch(() => {});
     return () => { active = false; subscription?.remove(); };
-  }, [tokens]);
+  }, [tokens, me?.id, setup.ready, setup.required]);
   return null;
 }

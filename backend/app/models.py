@@ -87,4 +87,5 @@ class Reminder(Base):
     due: Mapped[str]
     status: Mapped[str]=mapped_column(default='pending')
     attempts: Mapped[int]=mapped_column(default=0)
+    claimed_at: Mapped[str|None]=mapped_column(nullable=True)
     delivery: Mapped[list]=mapped_column(JSON, default=list)
