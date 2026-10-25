@@ -17,10 +17,10 @@ def listing(tab:str='active',q:str='',department:str='',priority:str='',cursor:s
     def in_tab(d,t):
         if d.get('status') in ('dismissed', 'cancelled'):
             return False if t != 'completed' else d['status'] == 'cancelled'
-        if t=='needs_review': return d['status']=='needs_review' or bool(d.get('proposed_updates'))
         if t=='completed': return d['status'] in ('completed','cancelled')
         if t=='agenda': return d['status'] not in ('dismissed','cancelled')
-        return d['status'] in ('new','in_progress','confirmed')
+        if t=='needs_review': return d['status']=='needs_review' or bool(d.get('proposed_updates'))
+        return d['status'] in ('new','in_progress','confirmed','needs_review')
     counts={t:sum(in_tab(r.data,t) for r in rows) for t in ('active','needs_review','completed')}
     rows=[r for r in rows if in_tab(r.data,tab) and (not q or q.casefold() in (r.data['title']+' '+r.data.get('organizer','')+' '+r.data.get('venue','')).casefold()) and (not priority or r.data['priority']==priority) and (not department or any(x['department']==department for x in r.data.get('requirements',[])))]
     rows.sort(key=lambda r:(r.data.get('setup_deadline') or '9999',r.id))

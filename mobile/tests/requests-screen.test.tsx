@@ -20,13 +20,13 @@ test('active filters remain visible when collapsed and can be reset in one actio
  await fireEvent.press(screen.getByRole('button',{name:'Clear filters'}));
  expect(mockPath).not.toContain('department=audio');
 });
-test('next event and pending review shortcut open the relevant work',async()=>{
+test('next event shortcut opens the request and tabs switch correctly',async()=>{
  const {router}=require('expo-router');await show();
  await waitFor(()=>expect(screen.getByRole('button',{name:/Next event: Next event/})).toBeTruthy());
  await fireEvent.press(screen.getByRole('button',{name:/Next event: Next event/}));
  expect(router.push).toHaveBeenCalledWith('/requests/future');
- await fireEvent.press(screen.getByRole('button',{name:'Review 3 requests'}));
- expect(mockPath).toContain('tab=needs_review');
+ await fireEvent.press(screen.getByRole('tab',{name:'Done requests'}));
+ expect(mockPath).toContain('tab=completed');
 });
 test('a connection error offers recovery instead of saying to connect an already connected mailbox',async()=>{
  mockStatus='error';await show();

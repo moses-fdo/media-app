@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { View, TextInput, Pressable, SectionList, ActivityIndicator, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, Search, RefreshCw, X, SlidersHorizontal, AlertTriangle } from 'lucide-react-native';
+import { Plus, Search, RefreshCw, X, SlidersHorizontal } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api, useAuth } from '../../auth/context';
 import { RequestPage, Mailbox, MediaRequest } from '../../api/types';
@@ -14,11 +14,16 @@ import { groupRequests } from '../../features/requests/presentation';
 import { createWidgetSnapshot, loadWidgetEvents } from '../../widgets/model';
 import { clock, dateLabel } from '../../features/requests/presentation';
 import { useCachedQuery } from '../../features/requests/useCachedQuery';
+import { registerForPushNotifications } from '../../notifications';
 
 export default function Requests() {
   const { colors: c } = useTheme();
   const { me } = useAuth();
   const [tab, setTab] = useState('active');
+
+  useEffect(() => {
+    registerForPushNotifications().catch(() => {});
+  }, []);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -68,13 +73,6 @@ export default function Requests() {
     return raw.filter(item => {
       if (item.status === 'dismissed') return false;
       if (item.status === 'cancelled') return tab === 'completed';
-      if (item.status === 'needs_review') {
-        const isManual = !item.sources || item.sources.length === 0;
-        if (!isManual) {
-          const hasTag = /^\[media\s*request\]/i.test((item.title || '').replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim());
-          if (!hasTag) return false;
-        }
-      }
       return true;
     });
   }, [query.data, more, tab]);
@@ -131,7 +129,6 @@ export default function Requests() {
           {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginBottom: 16 }}>{syncNotice}</Label>}
           {!search && !department && tab === 'active' && <View style={{ gap: 12, paddingBottom: 24 }}>
             {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.line, gap: 6 }}><Label size={13} style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={23} bold>{nextEvent.title}</Label><Label size={14}>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label><Label size={14} muted>{nextEvent.venue}</Label></Pressable>}
-            {!!query.data?.counts?.needs_review && <Button title={`Review ${query.data.counts.needs_review} ${query.data.counts.needs_review === 1 ? 'request' : 'requests'}`} quiet onPress={() => { setTab('needs_review'); resetPage(); }} />}
           </View>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surfaceSubtle, borderRadius: 10, borderWidth: 1, borderColor: c.line, paddingHorizontal: 12 }}>
@@ -144,8 +141,8 @@ export default function Requests() {
           {(!!search || !!department) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 8 }}><Label size={13} style={{ flex: 1, color: c.blue }}>{department ? department[0].toUpperCase() + department.slice(1) + ' equipment' : 'All equipment'}{search ? ` · “${search}”` : ''}</Label><Button title="Clear filters" quiet onPress={() => { setSearch(''); setDepartment(''); resetPage(); }} /></View>}
           {filtersOpen && <View style={{ paddingTop: 14, gap: 8 }}><Label size={12} muted>Equipment department</Label><View accessibilityRole="radiogroup" accessibilityLabel="Equipment department" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[['', 'All'], ['audio', 'Audio'], ['video', 'Video'], ['other', 'Other']].map(([key, label]) => <Pressable key={key} accessibilityRole="radio" accessibilityLabel={label} aria-checked={department === key} accessibilityState={{ checked: department === key }} onPress={() => { setDepartment(key); resetPage(); }} style={{ flex: 1, minWidth: 64, minHeight: 48, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: department === key ? c.blueSoft : c.surfaceSubtle }}><Label size={13} bold={department === key} style={{ color: department === key ? c.blue : c.muted }}>{label}</Label></Pressable>)}</View></View>}
           <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 18 }}>
-            {[['active', 'Active'], ['needs_review', 'Review'], ['completed', 'Done']].map(([key, label]) => {
-              const countVal = key === 'needs_review' && tab === 'needs_review' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
+            {[['active', 'Active'], ['completed', 'Done']].map(([key, label]) => {
+              const countVal = key === 'active' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
               return (
                 <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}>
                   <Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label>
@@ -154,17 +151,6 @@ export default function Requests() {
               );
             })}
           </View>
-          {tab === 'needs_review' && (
-            <View style={{ marginTop: 14, padding: 14, backgroundColor: c.amberSoft, borderRadius: 10, borderWidth: 1, borderColor: c.amber, gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <AlertTriangle size={16} color={c.amber} />
-                <Label size={14} bold style={{ color: c.amber }}>Strict Media Request Review</Label>
-              </View>
-              <Label size={12} style={{ color: c.ink, lineHeight: 18 }}>
-                Only requests matching the standard media request template appear here. Verify schedule, venue, and equipment before confirming.
-              </Label>
-            </View>
-          )}
           <ErrorNote error={query.error || syncError} />
           {(!!query.error || !!syncError) && <Button title="Retry loading requests" quiet busy={activeSync} onPress={refresh} style={{ marginTop: 12 }} />}
           {query.offline && <Label size={13} style={{ color: c.amber, marginTop: 12 }}>Offline · Showing saved requests</Label>}
@@ -175,10 +161,6 @@ export default function Requests() {
           title={
             search || department
               ? 'No matching requests'
-              : tab === 'active' && !!query.data?.counts?.needs_review
-              ? `${query.data.counts.needs_review} ${query.data.counts.needs_review === 1 ? 'request waiting in Review' : 'requests waiting in Review'}`
-              : tab === 'needs_review'
-              ? 'You’re all caught up'
               : tab === 'completed'
               ? 'No completed requests yet'
               : 'No active requests'
@@ -186,23 +168,15 @@ export default function Requests() {
           body={
             search || department
               ? 'Clear the filters to see all requests, or try another search.'
-              : tab === 'active' && !!query.data?.counts?.needs_review
-              ? 'Your incoming media request was received and is waiting for your confirmation in the Review tab.'
-              : tab === 'needs_review'
-              ? 'No media requests currently need review. General circulars and non-media emails are automatically excluded.'
               : tab === 'completed'
               ? 'Events you complete or cancel will appear here.'
               : mailboxIssue
               ? 'Connect your department Gmail to import requests, or add an event yourself.'
-              : 'Incoming Gmail requests will appear after sync. You can also add an event yourself.'
+              : 'Incoming requests with [MEDIA REQUEST] in the subject will appear here automatically.'
           }
           action={
             search || department
               ? { title: 'Show all requests', onPress: () => { setSearch(''); setDepartment(''); resetPage(); } }
-              : tab === 'active' && !!query.data?.counts?.needs_review
-              ? { title: 'Go to Review tab', onPress: () => { setTab('needs_review'); resetPage(); } }
-              : tab === 'needs_review'
-              ? { title: 'View Request Template', onPress: () => router.push('/settings/template') }
               : tab === 'active'
               ? { title: 'Add request', onPress: () => router.push('/requests/new') }
               : undefined
