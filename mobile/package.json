@@ -53,7 +53,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "judge": "node scripts/judge-mobile.mjs",
-    "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1",
+    "build:apk": "node scripts/build-apk.js",
     "check:release": "npm run typecheck && npm test -- --runInBand"
   },
   "private": true,

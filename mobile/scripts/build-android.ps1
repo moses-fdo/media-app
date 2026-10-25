@@ -77,9 +77,9 @@ try {
     if ($LASTEXITCODE) { throw 'Release checks failed.' }
     & npx.cmd expo prebuild --platform android --no-install
     if ($LASTEXITCODE) { throw 'Android prebuild failed.' }
-    # Replace a stale Linux SDK path in a checkout moved to Windows.
-    $sdkPath = $env:ANDROID_HOME.Replace('\', '/')
-    Set-Content -LiteralPath 'android/local.properties' -Value "sdk.dir=$sdkPath" -Encoding ascii
+    if (Test-Path -LiteralPath 'google-services.json') {
+        Copy-Item -LiteralPath 'google-services.json' -Destination 'android/app/google-services.json' -Force
+    }
     Push-Location android
     try { & .\gradlew.bat :app:assembleRelease --no-daemon; if ($LASTEXITCODE) { throw 'Gradle APK build failed.' } }
     finally { Pop-Location }

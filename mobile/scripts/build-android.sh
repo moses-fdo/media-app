@@ -12,8 +12,12 @@ if [[ ! -x "$ANDROID_HOME/platform-tools/adb" ]]; then
   exit 1
 fi
 npm run check:release
+rm -rf android
 npx expo prebuild --platform android --no-install
 printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
+if [[ -f google-services.json ]]; then
+  cp google-services.json android/app/google-services.json
+fi
 (cd android && ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)
 echo "APK: $PWD/android/app/build/outputs/apk/release/app-release.apk"
 echo 'Internal phone build; debug signing. Store publication requires private release signing.'
