@@ -26,6 +26,26 @@ def test_template_body_or_parsed_attachment_is_accepted():
         assert result.classification=='request'
         assert result.events[0].venue=='Main Auditorium'
 
+def test_body_tag_and_event_name_in_body_is_accepted():
+    body = """[MEDIA REQUEST]
+Event Name: Weekend Youth Summit
+Department / Organizer: Department of Student Affairs
+Venue: Main Auditorium
+Date: 2026-11-20
+Event Time: 10:00 AM
+Setup Deadline: 08:30 AM
+Audio Gear: 4 Wireless Microphones, 2 PA Speakers
+Video Gear: 1 LED Wall Display, 2 Cameras
+Contact Person: Dr. John (9876543210)
+Special Notes: Live streaming required.
+"""
+    result = ExtractionProvider().analyze(Message(subject='', body=body))
+    assert result.classification == 'request'
+    assert len(result.events) == 1
+    assert result.events[0].title == 'Weekend Youth Summit'
+    assert result.events[0].venue == 'Main Auditorium'
+    assert len(result.events[0].requirements) >= 2
+
 def test_unrelated_unsupported_attachment_cannot_create_a_review_entry(app):
     with app.state.db() as db:
         box=Mailbox(workspace_id='w1',email='dept@example.edu',encrypted_token='fake');db.add(box);db.flush()

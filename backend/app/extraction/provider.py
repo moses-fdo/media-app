@@ -5,7 +5,7 @@ from .schemas import AnalysisResult
 from ..schemas import RequestCreate, Requirement
 
 HEADERS_MAP = {
-    'title': ['event name', 'event title', 'title of event', 'event', 'title'],
+    'title': ['event name', 'event title', 'title of event', 'event', 'title', 'email subject', 'subject'],
     'organizer': ['department / organizer', 'organizer', 'department', 'requested by', 'organized by'],
     'venue': ['venue', 'location', 'hall', 'room', 'place'],
     'date': ['event date', 'date'],
@@ -122,15 +122,22 @@ def parse_template_sections(text):
     return sections
 
 
-def has_template_subject(subject):
-    subject = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', (subject or '').strip(), flags=re.I)
-    match = re.match(r'^\[media\s+request\]\s*(.+)$', subject, re.I)
-    return bool(match and match[1].strip() and not re.fullmatch(r'<[^>]+>', match[1].strip()))
+def has_template_subject(subject, body=None):
+    clean_sub = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', (subject or '').strip(), flags=re.I)
+    match = re.search(r'\[media\s+request\](?:\s*[:-]?\s*(.+))?', clean_sub, re.I)
+    if match:
+        remainder = (match.group(1) or '').strip()
+        if not remainder or not re.fullmatch(r'<[^>]+>', remainder):
+            return True
+    if body and re.search(r'\[media\s+request\]', body[:2000], re.I):
+        return True
+    return False
 
 
-def matches_template_fields(subject, sections):
+def matches_template_fields(subject, sections, body=None):
     required = ('organizer', 'venue', 'date', 'start_time', 'setup_deadline')
-    return has_template_subject(subject) and all(sections.get(key, '').strip() for key in required) and any(sections.get(key, '').strip() for key in ('audio', 'video', 'other_gear'))
+    has_tag = has_template_subject(subject, body)
+    return has_tag and all(sections.get(key, '').strip() for key in required) and any(sections.get(key, '').strip() for key in ('audio', 'video', 'other_gear'))
 
 
 def matches_media_template(message):
@@ -140,7 +147,7 @@ def matches_media_template(message):
         for key, value in parse_template_sections(text[:100000]).items():
             if key not in sections or not sections[key]:
                 sections[key] = value
-    return matches_template_fields(message.subject, sections)
+    return matches_template_fields(message.subject, sections, message.body)
 
 
 class ExtractionProvider:
@@ -165,11 +172,11 @@ class ExtractionProvider:
                 issues.append('Multiple ' + key.replace('_', ' ') + ' values; separate events need separate requests.')
         full_text = (subject + '\n' + '\n'.join(sources))[:200000]
         followup = bool(getattr(message, 'related_request', False))
-        templated = matches_template_fields(subject, sections)
+        templated = matches_template_fields(subject, sections, body)
         # A subject tag or a mention of AV equipment is not a request template.
         # Partial, structured replies are accepted only after the service links
         # the thread to an existing request; they must never create a new event.
-        structured_reply = followup and has_template_subject(subject) and any(sections.get(key, '').strip() for key in ('venue', 'date', 'start_time', 'setup_deadline', 'audio', 'video', 'other_gear', 'contact'))
+        structured_reply = followup and has_template_subject(subject, body) and any(sections.get(key, '').strip() for key in ('venue', 'date', 'start_time', 'setup_deadline', 'audio', 'video', 'other_gear', 'contact'))
         if not templated and not structured_reply:
             return AnalysisResult(classification='irrelevant')
         unstructured = not any(sections.get(key) for key in ('date', 'venue', 'audio', 'video', 'other_gear', 'start_time'))
@@ -188,13 +195,15 @@ class ExtractionProvider:
         clean_title = re.sub(r'^\s*\[?(?:media\s*request|media)\]?\s*[:-]?\s*', '', clean_title, flags=re.I).strip() or raw_title
         payload = {'title': clean_title[:250], 'timezone': self.tz_name}
         fields, parts = [], {}
-        for key in ('title', 'organizer', 'venue', 'contact', 'notes'):
+        for key in ('organizer', 'venue', 'contact', 'notes'):
             value = sections.get(key, '')
             if value:
                 target = 'summary' if key == 'notes' else key
-                limit = 5000 if target == 'summary' else 250 if target == 'title' else 500
+                limit = 5000 if target == 'summary' else 500
                 payload[target] = value[:limit]
                 fields.append(target)
+        if sections.get('title'):
+            fields.append('title')
         if requirements:
             payload['requirements'] = requirements
             fields.append('requirements')

@@ -28,7 +28,17 @@ def sync_mailbox(db,box,client,days=30):
                 if e.response.status_code==404:continue
                 raise
             if set(raw.get('labelIds',[])) & {'SPAM','TRASH','SENT','DRAFT'}:continue
-            db.add(Message(workspace_id=box.workspace_id,mailbox_id=box.id,provider_id=id,thread_id=raw.get('threadId',id),**parse_message(raw)));db.commit()
+            try:
+                with db.begin_nested():
+                    db.add(Message(workspace_id=box.workspace_id,mailbox_id=box.id,provider_id=id,thread_id=raw.get('threadId',id),**parse_message(raw)))
+                    db.flush()
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                err = str(e).lower()
+                if 'unique' in err or 'duplicate' in err or 'integrity' in err:
+                    continue
+                raise
         token=page.get('nextPageToken')
         if not token:
             db.execute(update(type(box)).where(type(box).id==box.id,type(box).encrypted_token!='',type(box).status!='reconnect_required').values(history_id=checkpoint if initial else page.get('historyId',checkpoint),last_synced=now(),status='connected'))

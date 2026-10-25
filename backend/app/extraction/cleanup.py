@@ -31,7 +31,7 @@ def exclude_non_template_imports(db, box):
             continue
         # Retention may already have removed the source. Lack of evidence is not
         # evidence of junk: preserve tagged records when their body is unavailable.
-        if any(has_template_subject(source.subject) and (not source.body or source.body == 'Source expired under retention policy') for source in valid_sources):
+        if any(has_template_subject(source.subject, source.body) and (not source.body or source.body == 'Source expired under retention policy') for source in valid_sources):
             continue
         if any(matches_media_template(source) for source in valid_sources):
             continue
@@ -41,5 +41,11 @@ def exclude_non_template_imports(db, box):
         save_data(db, record, updated, record.version, 'Email processing', 'Excluded non-template email under strict media-request policy')
         schedule_request_reminders(db, record)
         count += 1
+    # Rescue any messages that were previously misclassified as irrelevant but match the media request template
+    for msg in db.scalars(select(Message).where(Message.mailbox_id == box.id, Message.classification == 'irrelevant')).all():
+        if msg.body and matches_media_template(msg):
+            msg.status = 'queued'
+            msg.classification = None
+            db.flush()
     db.commit()
     return count
