@@ -163,8 +163,8 @@ export default function Requests() {
           {(!!search || !!department) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 8 }}><Label size={13} style={{ flex: 1, color: c.blue }}>{department ? department[0].toUpperCase() + department.slice(1) + ' equipment' : 'All equipment'}{search ? ` · “${search}”` : ''}</Label><Button title="Clear filters" quiet onPress={() => { setSearch(''); setDepartment(''); resetPage(); }} /></View>}
           {filtersOpen && <View style={{ paddingTop: 14, gap: 8 }}><Label size={12} muted>Equipment department</Label><View accessibilityRole="radiogroup" accessibilityLabel="Equipment department" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[['', 'All'], ['audio', 'Audio'], ['video', 'Video'], ['other', 'Other']].map(([key, label]) => <Pressable key={key} accessibilityRole="radio" accessibilityLabel={label} aria-checked={department === key} accessibilityState={{ checked: department === key }} onPress={() => { setDepartment(key); resetPage(); }} style={{ flex: 1, minWidth: 64, minHeight: 48, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: department === key ? c.blueSoft : c.surfaceSubtle }}><Label size={13} bold={department === key} style={{ color: department === key ? c.blue : c.muted }}>{label}</Label></Pressable>)}</View></View>}
           <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 18 }}>
-            {[['active', 'Active'], ['needs_review', 'Review'], ['completed', 'Done']].map(([key, label]) => {
-              const countVal = query.data?.counts?.[key] ?? (key === tab ? visibleItems.length : '');
+            {[['active', 'Active'], ['completed', 'Done']].map(([key, label]) => {
+              const countVal = key === 'active' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
               return (
                 <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}>
                   <Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label>
@@ -183,8 +183,6 @@ export default function Requests() {
           title={
             search || department
               ? 'No matching requests'
-              : tab === 'needs_review'
-              ? 'No requests need review'
               : tab === 'completed'
               ? 'No completed requests yet'
               : 'No active requests'
@@ -192,8 +190,6 @@ export default function Requests() {
           body={
             search || department
               ? 'Clear the filters to see all requests, or try another search.'
-              : tab === 'needs_review'
-              ? 'Requests with details to confirm or new email updates will appear here.'
               : tab === 'completed'
               ? 'Events you complete or cancel will appear here.'
               : mailboxIssue
