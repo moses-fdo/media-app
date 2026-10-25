@@ -31,6 +31,7 @@ def queue_sync(request, background_tasks, box, days=30, full=False):
         sync_one.delay(box.id, days, full=full, retry_failed=True)
     except Exception:
         raise HTTPException(503, 'Background queue unavailable. Retry synchronization shortly.')
+    background_tasks.add_task(run_in_process_sync, request.app.state.settings, box.id, days, full, True)
 
 
 @router.get('/mailbox/status')

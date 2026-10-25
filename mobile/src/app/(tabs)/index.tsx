@@ -117,12 +117,27 @@ export default function Requests() {
     setSyncError(null);
     try {
       if (!me?.demo && ['connected','error'].includes(mailbox.data?.status || '')) {
-        try { syncRequestedAt.current = Date.now(); await api.post('/mailbox/sync'); setRequestedAfter(mailbox.data?.last_synced || null); setSyncNotice('Sync requested. New requests will appear as processing finishes.'); }
-        catch (error) { setSyncError(error); }
+        try {
+          syncRequestedAt.current = Date.now();
+          await api.post('/mailbox/sync');
+          setRequestedAfter(mailbox.data?.last_synced || null);
+          setSyncNotice('Checking Gmail for new requests…');
+        } catch (error) {
+          setSyncError(error);
+          setSyncNotice('');
+        }
+      } else if (!me?.demo && mailbox.data?.status === 'disconnected') {
+        setSyncNotice('Gmail is not connected yet. Connect in Settings to sync.');
+      } else if (!me?.demo && mailbox.data?.status === 'reconnect_required') {
+        setSyncNotice('Gmail access expired. Reconnect in Settings.');
       }
       await Promise.all([query.refetch(), mailbox.refetch(), focus.refetch()]);
-    } catch (error) { setSyncError(error); }
-    finally { setIsSyncing(false); }
+      setSyncNotice(prev => prev || 'Requests refreshed.');
+    } catch (error) {
+      setSyncError(error);
+    } finally {
+      setIsSyncing(false);
+    }
   }
   async function next() {
     const nextCursor = cursor || query.data?.next_cursor;
@@ -184,6 +199,7 @@ export default function Requests() {
 
           {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginTop: 12, marginBottom: 12 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : 'Reconnect your Gmail to keep requests up to date.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
           {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginTop: 8, marginBottom: 8 }}>{syncNotice}</Label>}
+          {!!syncError && <View style={{ marginTop: 8, marginBottom: 8 }}><ErrorNote error={syncError} /></View>}
 
           {!search && !department && tab === 'active' && <View style={{ gap: 8, paddingVertical: 6 }}>
             {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line, gap: 2 }}><Label size={12} bold style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={16} bold>{nextEvent.title}</Label><Label size={13} muted>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label></Pressable>}

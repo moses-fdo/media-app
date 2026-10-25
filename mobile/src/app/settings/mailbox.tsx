@@ -30,15 +30,25 @@ export default function MailboxSettings() {
     try {
       await api.post('/mailbox/sync');
       await queryClient.invalidateQueries();
+      let updated = false;
       for (let i = 0; i < 8; i++) {
         const res = await query.refetch();
         if (res.data?.last_synced && res.data?.status !== 'syncing') {
+          updated = true;
           break;
         }
         await new Promise(r => setTimeout(r, 1500));
       }
-    } catch (e) {
+      Alert.alert(
+        'Sync Complete',
+        updated
+          ? 'Gmail checked successfully. Your requests and sync timestamp are up to date.'
+          : 'Sync started. New requests will appear as processing finishes.'
+      );
+    } catch (e: any) {
+      const msg = e?.message || String(e);
       setError(e);
+      Alert.alert('Sync Error', msg || 'Unable to sync mailbox. Please check your connection.');
     } finally {
       setBusy(false);
     }
@@ -51,8 +61,9 @@ export default function MailboxSettings() {
       await api.post('/mailbox/backfill?days=90');
       await query.refetch();
       Alert.alert('Backfill Queued', 'Syncing previous 90 days of incoming messages.');
-    } catch (e) {
+    } catch (e: any) {
       setError(e);
+      Alert.alert('Backfill Error', e?.message || 'Unable to queue backfill.');
     } finally {
       setBusy(false);
     }

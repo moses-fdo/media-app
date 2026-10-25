@@ -20,7 +20,7 @@ def create_app(settings=None):
     @asynccontextmanager
     async def lifespan(app):
         task = None
-        if settings.in_process_sync and settings.environment != 'test':
+        if settings.environment != 'test':
             async def sync_loop():
                 from .gmail.sync import run_in_process_sync
                 while True:
@@ -31,7 +31,7 @@ def create_app(settings=None):
                         for mailbox_id in ids:
                             await asyncio.to_thread(run_in_process_sync, settings, mailbox_id, 30)
                     except Exception:
-                        logger.exception('Development mailbox polling failed')
+                        logger.exception('Periodic mailbox sync failed')
             task = asyncio.create_task(sync_loop())
         # Startup never classifies or deletes existing user data.
         try:
