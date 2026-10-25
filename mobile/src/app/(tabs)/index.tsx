@@ -63,7 +63,18 @@ export default function Requests() {
     return () => loop.stop();
   }, [activeSync, spinAnim, reducedMotion]);
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const sections = useMemo(() => groupRequests([...(query.data?.items || []), ...more], me?.timezone || 'Asia/Kolkata'), [query.data, more, me]);
+  const visibleItems = useMemo(() => {
+    const raw = [...(query.data?.items || []), ...more];
+    return raw.filter(item => {
+      if (item.status === 'needs_review') {
+        const hasTag = /^\[media\s*request\]/i.test((item.title || '').replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim());
+        const hasGear = item.requirements && item.requirements.length > 0;
+        if (!hasTag && !hasGear) return false;
+      }
+      return true;
+    });
+  }, [query.data, more]);
+  const sections = useMemo(() => groupRequests(visibleItems, me?.timezone || 'Asia/Kolkata'), [visibleItems, me]);
   function resetPage() { setMore([]); setCursor(null); }
   async function refresh() {
     if (isSyncing) return;
@@ -129,7 +140,15 @@ export default function Requests() {
           {(!!search || !!department) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 8 }}><Label size={13} style={{ flex: 1, color: c.blue }}>{department ? department[0].toUpperCase() + department.slice(1) + ' equipment' : 'All equipment'}{search ? ` · “${search}”` : ''}</Label><Button title="Clear filters" quiet onPress={() => { setSearch(''); setDepartment(''); resetPage(); }} /></View>}
           {filtersOpen && <View style={{ paddingTop: 14, gap: 8 }}><Label size={12} muted>Equipment department</Label><View accessibilityRole="radiogroup" accessibilityLabel="Equipment department" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[['', 'All'], ['audio', 'Audio'], ['video', 'Video'], ['other', 'Other']].map(([key, label]) => <Pressable key={key} accessibilityRole="radio" accessibilityLabel={label} aria-checked={department === key} accessibilityState={{ checked: department === key }} onPress={() => { setDepartment(key); resetPage(); }} style={{ flex: 1, minWidth: 64, minHeight: 48, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: department === key ? c.blueSoft : c.surfaceSubtle }}><Label size={13} bold={department === key} style={{ color: department === key ? c.blue : c.muted }}>{label}</Label></Pressable>)}</View></View>}
           <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 18 }}>
-            {[['active', 'Active'], ['needs_review', 'Review'], ['completed', 'Done']].map(([key, label]) => <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}><Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label><Label size={13} style={{ color: tab === key ? c.blue : c.muted }}>{query.data?.counts?.[key] ?? ''}</Label></Pressable>)}
+            {[['active', 'Active'], ['needs_review', 'Review'], ['completed', 'Done']].map(([key, label]) => {
+              const countVal = key === 'needs_review' && tab === 'needs_review' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
+              return (
+                <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}>
+                  <Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label>
+                  <Label size={13} style={{ color: tab === key ? c.blue : c.muted }}>{countVal}</Label>
+                </Pressable>
+              );
+            })}
           </View>
           <ErrorNote error={query.error || syncError} />
           {(!!query.error || !!syncError) && <Button title="Retry loading requests" quiet busy={activeSync} onPress={refresh} style={{ marginTop: 12 }} />}
