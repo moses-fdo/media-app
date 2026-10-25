@@ -69,12 +69,11 @@ export default function Requests() {
       if (item.status === 'dismissed') return false;
       if (item.status === 'cancelled') return tab === 'completed';
       if (item.status === 'needs_review') {
-        const hasTag = /^\[media\s*request\]/i.test((item.title || '').replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim());
-        const hasGear = item.requirements && item.requirements.length > 0;
-        const hasVenue = !!item.venue && item.venue.trim().length > 0;
         const isManual = !item.sources || item.sources.length === 0;
-        if (!isManual && !hasTag && !hasGear) return false;
-        if (!isManual && !hasGear && !hasVenue) return false;
+        if (!isManual) {
+          const hasTag = /^\[media\s*request\]/i.test((item.title || '').replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim());
+          if (!hasTag) return false;
+        }
       }
       return true;
     });

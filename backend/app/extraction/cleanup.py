@@ -12,7 +12,7 @@ def exclude_non_template_imports(db, box_or_workspace_id):
     mailbox_id = getattr(box_or_workspace_id, 'id', None)
     count = 0
     records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == workspace_id).with_for_update()).all()
-    # 1. Rescue any requests that were accidentally dismissed under template_excluded but actually match
+    # 1. Rescue ONLY requests whose sources or title genuinely match the media request template
     for record in records:
         data = record.data
         if data.get('template_excluded') and data.get('status') == 'dismissed':
@@ -21,9 +21,7 @@ def exclude_non_template_imports(db, box_or_workspace_id):
             is_valid = False
             if valid_sources and any(matches_media_template(s) for s in valid_sources):
                 is_valid = True
-            elif data.get('requirements') and len(data.get('requirements', [])) > 0:
-                is_valid = True
-            elif has_template_subject(data.get('title')):
+            elif not valid_sources and has_template_subject(data.get('title')):
                 is_valid = True
             if is_valid:
                 from ..requests.validation import required_review_reasons
@@ -35,7 +33,7 @@ def exclude_non_template_imports(db, box_or_workspace_id):
                 save_data(db, record, updated, record.version, 'Email processing', 'Restored valid media request')
                 schedule_request_reminders(db, record)
 
-    # 2. Exclude untouched non-template imports
+    # 2. Strictly dismiss all untouched non-template imports (circulars, newsletters, announcements)
     records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == workspace_id).with_for_update()).all()
     for record in records:
         data = record.data
@@ -43,9 +41,9 @@ def exclude_non_template_imports(db, box_or_workspace_id):
             continue
         if data.get('manual_fields'):
             continue
-        if not data.get('sources') and not any(item.get('actor') == 'Email processing' for item in data.get('activity', [])):
-            continue
         if any(item.get('actor') not in ('Email processing', 'System') for item in data.get('activity', [])):
+            continue
+        if not data.get('sources') and not any(item.get('actor') == 'Email processing' for item in data.get('activity', [])):
             continue
         sources = [db.get(Message, source_id) for source_id in data.get('sources', [])]
         valid_sources = [s for s in sources if s is not None and s.workspace_id == workspace_id]
@@ -55,7 +53,7 @@ def exclude_non_template_imports(db, box_or_workspace_id):
             if any(has_template_subject(source.subject, source.body) and (not source.body or source.body == 'Source expired under retention policy') for source in valid_sources):
                 continue
         else:
-            if data.get('requirements') and data.get('venue') and (has_template_subject(data.get('title')) or len(data.get('requirements', [])) >= 1):
+            if has_template_subject(data.get('title')):
                 continue
         updated = deepcopy(data)
         updated['status'] = 'dismissed'
