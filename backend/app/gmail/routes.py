@@ -42,9 +42,11 @@ def status(request: Request, member=Depends(require_member), db=Depends(get_sess
 
 
 @router.post('/mailbox/sync', status_code=202)
-def sync(background_tasks: BackgroundTasks, request: Request, member=Depends(require_member), db=Depends(get_session)):
+def sync(background_tasks: BackgroundTasks, request: Request, full: bool = Query(False), member=Depends(require_member), db=Depends(get_session)):
     box = connected_mailbox(request, db, member.workspace_id)
-    queue_sync(request, background_tasks, box)
+    from ..models import RequestRecord
+    has_requests = db.scalar(select(RequestRecord.id).where(RequestRecord.workspace_id == member.workspace_id).limit(1)) is not None
+    queue_sync(request, background_tasks, box, full=full or not has_requests)
     return {'status': 'queued'}
 
 

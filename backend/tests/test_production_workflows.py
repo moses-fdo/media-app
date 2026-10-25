@@ -45,10 +45,11 @@ def test_invalid_dates_go_to_review(raw):
     assert any('Invalid event date' in reason for reason in result.review_reasons)
 
 
-def test_new_email_missing_setup_header_is_excluded():
+def test_new_email_missing_setup_header_goes_to_review():
     result=analyze(TEMPLATE.replace('Setup Deadline: 08:30 AM\n',''))
-    assert result.classification=='irrelevant'
-    assert result.events==[]
+    assert result.classification=='request'
+    assert result.events[0].status=='needs_review'
+    assert any('Setup deadline suggested' in reason for reason in result.review_reasons)
 
 
 def test_unsubscribe_footer_does_not_discard_request():

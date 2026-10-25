@@ -27,7 +27,11 @@ def sync_mailbox(db,box,client,days=30):
             except httpx.HTTPStatusError as e:
                 if e.response.status_code==404:continue
                 raise
-            if set(raw.get('labelIds',[])) & {'SPAM','TRASH','SENT','DRAFT'}:continue
+            labels = set(raw.get('labelIds', []))
+            if labels & {'SPAM', 'TRASH', 'DRAFT'}:
+                continue
+            if 'SENT' in labels and 'INBOX' not in labels:
+                continue
             try:
                 with db.begin_nested():
                     db.add(Message(workspace_id=box.workspace_id,mailbox_id=box.id,provider_id=id,thread_id=raw.get('threadId',id),**parse_message(raw)))

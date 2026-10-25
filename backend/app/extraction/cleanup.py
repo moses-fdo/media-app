@@ -12,6 +12,31 @@ def exclude_non_template_imports(db, box_or_workspace_id):
     mailbox_id = getattr(box_or_workspace_id, 'id', None)
     count = 0
     records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == workspace_id).with_for_update()).all()
+    # 1. Rescue any requests that were accidentally dismissed under template_excluded but actually match
+    for record in records:
+        data = record.data
+        if data.get('template_excluded') and data.get('status') == 'dismissed':
+            sources = [db.get(Message, sid) for sid in data.get('sources', [])]
+            valid_sources = [s for s in sources if s is not None and s.workspace_id == workspace_id]
+            is_valid = False
+            if valid_sources and any(matches_media_template(s) for s in valid_sources):
+                is_valid = True
+            elif data.get('requirements') and len(data.get('requirements', [])) > 0:
+                is_valid = True
+            elif has_template_subject(data.get('title')):
+                is_valid = True
+            if is_valid:
+                from ..requests.validation import required_review_reasons
+                updated = deepcopy(data)
+                updated.pop('template_excluded', None)
+                reasons = required_review_reasons(updated)
+                updated['status'] = 'needs_review' if reasons else 'new'
+                updated['review_reasons'] = reasons
+                save_data(db, record, updated, record.version, 'Email processing', 'Restored valid media request')
+                schedule_request_reminders(db, record)
+
+    # 2. Exclude untouched non-template imports
+    records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == workspace_id).with_for_update()).all()
     for record in records:
         data = record.data
         if data.get('status') in ('dismissed', 'cancelled'):

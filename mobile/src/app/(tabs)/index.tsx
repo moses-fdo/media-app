@@ -172,7 +172,43 @@ export default function Requests() {
         </View>}
         renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.line }}><Label bold size={15} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.ink }}>{section.title}</Label><Label muted size={12}>{section.data.length} {section.data.length === 1 ? 'event' : 'events'}</Label></View>}
         renderItem={({ item }) => <RequestRow item={item} onPress={() => router.push('/requests/' + item.id)} />}
-        ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty title={search || department ? 'No matching requests' : tab === 'needs_review' ? 'You’re all caught up' : tab === 'completed' ? 'No completed requests yet' : 'No active requests'} body={search || department ? 'Clear the filters to see all requests, or try another search.' : tab === 'needs_review' ? 'No media requests currently need review. General circulars and non-media emails are automatically excluded.' : tab === 'completed' ? 'Events you complete or cancel will appear here.' : mailboxIssue ? 'Connect your department Gmail to import requests, or add an event yourself.' : 'Incoming Gmail requests will appear after sync. You can also add an event yourself.'} action={search || department ? { title: 'Show all requests', onPress: () => { setSearch(''); setDepartment(''); resetPage(); } } : tab === 'needs_review' ? { title: 'View Request Template', onPress: () => router.push('/settings/template') } : tab === 'active' ? { title: 'Add request', onPress: () => router.push('/requests/new') } : undefined} />}
+        ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty
+          title={
+            search || department
+              ? 'No matching requests'
+              : tab === 'active' && !!query.data?.counts?.needs_review
+              ? `${query.data.counts.needs_review} ${query.data.counts.needs_review === 1 ? 'request waiting in Review' : 'requests waiting in Review'}`
+              : tab === 'needs_review'
+              ? 'You’re all caught up'
+              : tab === 'completed'
+              ? 'No completed requests yet'
+              : 'No active requests'
+          }
+          body={
+            search || department
+              ? 'Clear the filters to see all requests, or try another search.'
+              : tab === 'active' && !!query.data?.counts?.needs_review
+              ? 'Your incoming media request was received and is waiting for your confirmation in the Review tab.'
+              : tab === 'needs_review'
+              ? 'No media requests currently need review. General circulars and non-media emails are automatically excluded.'
+              : tab === 'completed'
+              ? 'Events you complete or cancel will appear here.'
+              : mailboxIssue
+              ? 'Connect your department Gmail to import requests, or add an event yourself.'
+              : 'Incoming Gmail requests will appear after sync. You can also add an event yourself.'
+          }
+          action={
+            search || department
+              ? { title: 'Show all requests', onPress: () => { setSearch(''); setDepartment(''); resetPage(); } }
+              : tab === 'active' && !!query.data?.counts?.needs_review
+              ? { title: 'Go to Review tab', onPress: () => { setTab('needs_review'); resetPage(); } }
+              : tab === 'needs_review'
+              ? { title: 'View Request Template', onPress: () => router.push('/settings/template') }
+              : tab === 'active'
+              ? { title: 'Add request', onPress: () => router.push('/requests/new') }
+              : undefined
+          }
+        />}
         ListFooterComponent={cursor !== 'END' && (cursor || query.data?.next_cursor) ? <Button title="Load more requests" quiet busy={paging} onPress={next} style={{ marginTop: 20 }} /> : undefined}
       />
     </SafeAreaView>

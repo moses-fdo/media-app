@@ -135,9 +135,11 @@ def has_template_subject(subject, body=None):
 
 
 def matches_template_fields(subject, sections, body=None):
-    required = ('organizer', 'venue', 'date', 'start_time', 'setup_deadline')
     has_tag = has_template_subject(subject, body)
-    return has_tag and all(sections.get(key, '').strip() for key in required) and any(sections.get(key, '').strip() for key in ('audio', 'video', 'other_gear'))
+    has_gear = any(sections.get(key, '').strip() for key in ('audio', 'video', 'other_gear'))
+    has_time = bool(sections.get('start_time', '').strip())
+    has_details = any(sections.get(key, '').strip() for key in ('venue', 'date', 'organizer'))
+    return has_tag and has_gear and has_time and has_details
 
 
 def matches_media_template(message):
