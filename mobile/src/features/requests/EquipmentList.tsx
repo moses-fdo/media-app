@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { AlertCircle } from 'lucide-react-native';
 import { Requirement } from '../../api/types';
 import { Label } from '../../components/ui';
 import { useTheme } from '../../theme';
@@ -17,7 +18,12 @@ export function EquipmentList({ requirements }: { requirements: Requirement[] })
         <Label size={13} bold muted style={{ paddingBottom: 4 }}>{department === 'audio' ? 'Audio' : department === 'video' ? 'Video' : 'Other equipment'}</Label>
         {items.map(item => <View key={item.id} style={{ gap: 4, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}>
           <Label size={16} style={{ lineHeight: 24 }}>{item.quantity == null ? item.title : `${item.quantity} × ${item.title}`}</Label>
-          {item.quantity == null && <Label size={13} muted>Quantity to confirm</Label>}
+          {item.quantity == null && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <AlertCircle size={13} color={c.amber} />
+              <Label size={13} bold style={{ color: c.amber }}>Quantity to confirm</Label>
+            </View>
+          )}
           {!!item.notes && <Label size={14} muted>{item.notes}</Label>}
         </View>)}
       </View>;

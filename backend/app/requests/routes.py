@@ -11,12 +11,12 @@ router=APIRouter(prefix='/api/v1')
 @router.get('/requests')
 def listing(tab:str='active',q:str='',department:str='',priority:str='',cursor:str|None=None,limit:int=Query(30,ge=1,le=100),member=Depends(require_member),db=Depends(get_session)):
     if tab not in ('active','needs_review','completed','agenda'): raise HTTPException(422,'Unknown request filter')
-    box = db.scalar(select(Mailbox).where(Mailbox.workspace_id == member.workspace_id))
-    if box:
-        from ..extraction.cleanup import exclude_non_template_imports
-        exclude_non_template_imports(db, box)
+    from ..extraction.cleanup import exclude_non_template_imports
+    exclude_non_template_imports(db, member.workspace_id)
     rows=list(db.scalars(select(RequestRecord).where(RequestRecord.workspace_id==member.workspace_id)))
     def in_tab(d,t):
+        if d.get('status') in ('dismissed', 'cancelled'):
+            return False if t != 'completed' else d['status'] == 'cancelled'
         if t=='needs_review': return d['status']=='needs_review' or bool(d.get('proposed_updates'))
         if t=='completed': return d['status'] in ('completed','cancelled')
         if t=='agenda': return d['status'] not in ('dismissed','cancelled')

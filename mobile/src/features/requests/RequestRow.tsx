@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { ChevronRight, Clock3, MapPin, CalendarDays } from 'lucide-react-native';
+import { ChevronRight, Clock3, MapPin, CalendarDays, AlertCircle, Mail } from 'lucide-react-native';
 import { MediaRequest } from '../../api/types';
 import { useTheme } from '../../theme';
 import { Label, AnimatedPressable } from '../../components/ui';
@@ -9,7 +9,8 @@ export function RequestRow({ item, onPress }: { item: MediaRequest; onPress: () 
   const { colors: c } = useTheme();
   const done = ['completed', 'cancelled', 'dismissed'].includes(item.status);
   const overdue = !done && !!item.setup_deadline && Date.parse(item.setup_deadline) < Date.now();
-  const tone = item.status === 'completed' ? c.green : item.status === 'needs_review' ? c.amber : c.muted;
+  const isReview = item.status === 'needs_review';
+  const tone = item.status === 'completed' ? c.green : isReview ? c.amber : c.muted;
   const deadlineTone = overdue ? c.red : done ? c.muted : c.amber;
   const deadline = overdue ? 'Setup overdue · ' + clock(item.setup_deadline!, item.timezone) : formatDeadline(item.setup_deadline, item.timezone);
   const equipment = item.requirements?.length
@@ -18,6 +19,12 @@ export function RequestRow({ item, onPress }: { item: MediaRequest; onPress: () 
   const schedule = dateLabel(item.event_start, item.timezone) + (item.event_start ? ' · ' + clock(item.event_start, item.timezone) : '');
   return (
     <AnimatedPressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${schedule}, ${statusLabel(item.status)}, ${deadline}`} onPress={onPress} activeScale={0.99} style={{ paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: c.line }}>
+      {isReview && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.amberSoft, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 }}>
+          <AlertCircle size={13} color={c.amber} />
+          <Label size={12} bold style={{ color: c.amber }}>Needs Review</Label>
+        </View>
+      )}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
         <Label bold size={22} style={{ flex: 1, lineHeight: 29, letterSpacing: -0.4 }}>{item.title}</Label>
         <ChevronRight size={20} color={c.muted} strokeWidth={1.6} style={{ marginTop: 5 }} />
@@ -28,11 +35,22 @@ export function RequestRow({ item, onPress }: { item: MediaRequest; onPress: () 
         <Label size={13} muted>{item.organizer || 'Organizer to confirm'}</Label>
         <Label size={14} muted numberOfLines={2} style={{ lineHeight: 21 }}>{equipment}</Label>
       </View>
+      {isReview && !!item.review_reasons?.length && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <AlertCircle size={13} color={c.amber} />
+          <Label size={12} bold style={{ color: c.amber }}>{item.review_reasons[0]}</Label>
+        </View>
+      )}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 16 }}>
         <View style={{ flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 7 }}><Clock3 size={15} color={deadlineTone} /><Label size={13} style={{ color: deadlineTone, flex: 1 }}>{deadline}</Label></View>
         <Label size={12} style={{ color: tone }}>{statusLabel(item.status)}</Label>
       </View>
-      {!!item.proposed_updates?.length && <Label size={13} style={{ color: c.amber, marginTop: 8 }}>Email update to review</Label>}
+      {!!item.proposed_updates?.length && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.blueSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start' }}>
+          <Mail size={13} color={c.blue} />
+          <Label size={12} bold style={{ color: c.blue }}>Email update to review</Label>
+        </View>
+      )}
     </AnimatedPressable>
   );
 }

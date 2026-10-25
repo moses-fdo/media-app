@@ -303,7 +303,38 @@ export default function Detail() {
           )}
 
 
-          {r.review_reasons.map((reason) => (
+          {r.status === 'needs_review' && (
+            <View
+              style={{
+                backgroundColor: c.amberSoft,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: c.amber,
+                padding: 16,
+                gap: 10,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={18} color={c.amber} />
+                <Label bold size={15} style={{ color: c.amber, flex: 1 }}>
+                  Review & Confirmation Required
+                </Label>
+              </View>
+              <Label size={13} style={{ color: c.ink, lineHeight: 18 }}>
+                This request was extracted from an email matching the Karunya Media Desk template. Please verify the event logistics and equipment quantities before confirming.
+              </Label>
+              {r.review_reasons.map((reason) => (
+                <View key={reason} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.amber }} />
+                  <Label size={13} bold style={{ color: c.amber, flex: 1 }}>
+                    {reason}
+                  </Label>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {r.status !== 'needs_review' && r.review_reasons.map((reason) => (
             <View
               key={reason}
               style={{

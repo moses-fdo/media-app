@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { View, TextInput, Pressable, SectionList, ActivityIndicator, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, Search, RefreshCw, X, SlidersHorizontal } from 'lucide-react-native';
+import { Plus, Search, RefreshCw, X, SlidersHorizontal, AlertTriangle } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api, useAuth } from '../../auth/context';
 import { RequestPage, Mailbox, MediaRequest } from '../../api/types';
@@ -66,14 +66,19 @@ export default function Requests() {
   const visibleItems = useMemo(() => {
     const raw = [...(query.data?.items || []), ...more];
     return raw.filter(item => {
+      if (item.status === 'dismissed') return false;
+      if (item.status === 'cancelled') return tab === 'completed';
       if (item.status === 'needs_review') {
         const hasTag = /^\[media\s*request\]/i.test((item.title || '').replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim());
         const hasGear = item.requirements && item.requirements.length > 0;
-        if (!hasTag && !hasGear) return false;
+        const hasVenue = !!item.venue && item.venue.trim().length > 0;
+        const isManual = !item.sources || item.sources.length === 0;
+        if (!isManual && !hasTag && !hasGear) return false;
+        if (!isManual && !hasGear && !hasVenue) return false;
       }
       return true;
     });
-  }, [query.data, more]);
+  }, [query.data, more, tab]);
   const sections = useMemo(() => groupRequests(visibleItems, me?.timezone || 'Asia/Kolkata'), [visibleItems, me]);
   function resetPage() { setMore([]); setCursor(null); }
   async function refresh() {
@@ -150,13 +155,24 @@ export default function Requests() {
               );
             })}
           </View>
+          {tab === 'needs_review' && (
+            <View style={{ marginTop: 14, padding: 14, backgroundColor: c.amberSoft, borderRadius: 10, borderWidth: 1, borderColor: c.amber, gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={16} color={c.amber} />
+                <Label size={14} bold style={{ color: c.amber }}>Strict Media Request Review</Label>
+              </View>
+              <Label size={12} style={{ color: c.ink, lineHeight: 18 }}>
+                Only requests matching the standard media request template appear here. Verify schedule, venue, and equipment before confirming.
+              </Label>
+            </View>
+          )}
           <ErrorNote error={query.error || syncError} />
           {(!!query.error || !!syncError) && <Button title="Retry loading requests" quiet busy={activeSync} onPress={refresh} style={{ marginTop: 12 }} />}
           {query.offline && <Label size={13} style={{ color: c.amber, marginTop: 12 }}>Offline · Showing saved requests</Label>}
         </View>}
         renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.line }}><Label bold size={15} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.ink }}>{section.title}</Label><Label muted size={12}>{section.data.length} {section.data.length === 1 ? 'event' : 'events'}</Label></View>}
         renderItem={({ item }) => <RequestRow item={item} onPress={() => router.push('/requests/' + item.id)} />}
-        ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty title={search || department ? 'No matching requests' : tab === 'needs_review' ? 'You’re all caught up' : tab === 'completed' ? 'No completed requests yet' : 'No active requests'} body={search || department ? 'Clear the filters to see all requests, or try another search.' : tab === 'needs_review' ? 'There are no event details or email changes waiting for your review.' : tab === 'completed' ? 'Events you complete or cancel will appear here.' : mailboxIssue ? 'Connect your department Gmail to import requests, or add an event yourself.' : 'Incoming Gmail requests will appear after sync. You can also add an event yourself.'} action={search || department ? { title: 'Show all requests', onPress: () => { setSearch(''); setDepartment(''); resetPage(); } } : tab === 'active' ? { title: 'Add request', onPress: () => router.push('/requests/new') } : undefined} />}
+        ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty title={search || department ? 'No matching requests' : tab === 'needs_review' ? 'You’re all caught up' : tab === 'completed' ? 'No completed requests yet' : 'No active requests'} body={search || department ? 'Clear the filters to see all requests, or try another search.' : tab === 'needs_review' ? 'No media requests currently need review. General circulars and non-media emails are automatically excluded.' : tab === 'completed' ? 'Events you complete or cancel will appear here.' : mailboxIssue ? 'Connect your department Gmail to import requests, or add an event yourself.' : 'Incoming Gmail requests will appear after sync. You can also add an event yourself.'} action={search || department ? { title: 'Show all requests', onPress: () => { setSearch(''); setDepartment(''); resetPage(); } } : tab === 'needs_review' ? { title: 'View Request Template', onPress: () => router.push('/settings/template') } : tab === 'active' ? { title: 'Add request', onPress: () => router.push('/requests/new') } : undefined} />}
         ListFooterComponent={cursor !== 'END' && (cursor || query.data?.next_cursor) ? <Button title="Load more requests" quiet busy={paging} onPress={next} style={{ marginTop: 20 }} /> : undefined}
       />
     </SafeAreaView>

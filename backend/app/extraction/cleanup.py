@@ -7,34 +7,31 @@ from ..reminders.service import schedule_request_reminders
 from .provider import matches_media_template, has_template_subject
 
 
-def exclude_non_template_imports(db, box):
+def exclude_non_template_imports(db, box_or_workspace_id):
+    workspace_id = box_or_workspace_id.workspace_id if hasattr(box_or_workspace_id, 'workspace_id') else box_or_workspace_id
+    mailbox_id = getattr(box_or_workspace_id, 'id', None)
     count = 0
-    records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == box.workspace_id).with_for_update()).all()
+    records = db.scalars(select(RequestRecord).where(RequestRecord.workspace_id == workspace_id).with_for_update()).all()
     for record in records:
         data = record.data
-        if data.get('status') != 'needs_review' or data.get('manual_fields') or not data.get('sources'):
+        if data.get('status') in ('dismissed', 'cancelled'):
             continue
-        if any(item.get('actor') != 'Email processing' for item in data.get('activity', [])):
+        if data.get('manual_fields'):
             continue
-        sources = [db.get(Message, source_id) for source_id in data['sources']]
-        if any(source and source.workspace_id != box.workspace_id for source in sources):
+        if not data.get('sources') and not any(item.get('actor') == 'Email processing' for item in data.get('activity', [])):
             continue
-        valid_sources = [s for s in sources if s is not None]
-        if not valid_sources:
-            if not has_template_subject(data.get('title')):
-                updated = deepcopy(data)
-                updated['status'] = 'dismissed'
-                updated['template_excluded'] = True
-                save_data(db, record, updated, record.version, 'Email processing', 'Excluded non-template email under strict media-request policy')
-                schedule_request_reminders(db, record)
-                count += 1
+        if any(item.get('actor') not in ('Email processing', 'System') for item in data.get('activity', [])):
             continue
-        # Retention may already have removed the source. Lack of evidence is not
-        # evidence of junk: preserve tagged records when their body is unavailable.
-        if any(has_template_subject(source.subject, source.body) and (not source.body or source.body == 'Source expired under retention policy') for source in valid_sources):
-            continue
-        if any(matches_media_template(source) for source in valid_sources):
-            continue
+        sources = [db.get(Message, source_id) for source_id in data.get('sources', [])]
+        valid_sources = [s for s in sources if s is not None and s.workspace_id == workspace_id]
+        if valid_sources:
+            if any(matches_media_template(source) for source in valid_sources):
+                continue
+            if any(has_template_subject(source.subject, source.body) and (not source.body or source.body == 'Source expired under retention policy') for source in valid_sources):
+                continue
+        else:
+            if data.get('requirements') and data.get('venue') and (has_template_subject(data.get('title')) or len(data.get('requirements', [])) >= 1):
+                continue
         updated = deepcopy(data)
         updated['status'] = 'dismissed'
         updated['template_excluded'] = True
@@ -42,10 +39,14 @@ def exclude_non_template_imports(db, box):
         schedule_request_reminders(db, record)
         count += 1
     # Rescue any messages that were previously misclassified as irrelevant but match the media request template
-    for msg in db.scalars(select(Message).where(Message.mailbox_id == box.id, Message.classification == 'irrelevant')).all():
+    msg_query = select(Message).where(Message.workspace_id == workspace_id, Message.classification == 'irrelevant')
+    if mailbox_id:
+        msg_query = msg_query.where(Message.mailbox_id == mailbox_id)
+    for msg in db.scalars(msg_query).all():
         if msg.body and matches_media_template(msg):
             msg.status = 'queued'
             msg.classification = None
             db.flush()
     db.commit()
     return count
+
