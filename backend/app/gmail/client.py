@@ -13,7 +13,7 @@ class GmailClient:
         if r.status_code==401:raise ReconnectRequired('Gmail authorization expired')
         r.raise_for_status();return r.json()
     def profile(self):return self.get('profile')
-    def list_messages(self,page_token=None,days=30):return self.get('messages',{'q':f'newer_than:{days}d -in:spam -in:trash -in:sent','maxResults':100,**({'pageToken':page_token} if page_token else {})})
+    def list_messages(self,page_token=None,days=30):return self.get('messages',{'q':f'"[MEDIA REQUEST]" newer_than:{days}d -in:spam -in:trash','maxResults':100,**({'pageToken':page_token} if page_token else {})})
     def get_message(self,id):return self.get('messages/'+id,{'format':'full'})
     def list_history(self,start,page_token=None):return self.get('history',{'startHistoryId':start,'historyTypes':'messageAdded','maxResults':100,**({'pageToken':page_token} if page_token else {})})
     def get_attachment(self,message_id,attachment_id):

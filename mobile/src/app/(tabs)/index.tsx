@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { View, TextInput, Pressable, SectionList, ActivityIndicator, Animated, Easing } from 'react-native';
+import { View, TextInput, Pressable, SectionList, ActivityIndicator, Animated, Easing, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Plus, Search, RefreshCw, X, SlidersHorizontal } from 'lucide-react-native';
@@ -21,6 +21,7 @@ export default function Requests() {
   const { me } = useAuth();
   const [tab, setTab] = useState('active');
 
+  const autoSyncedRef = useRef(false);
   useEffect(() => {
     registerForPushNotifications().catch(() => {});
   }, []);
@@ -45,6 +46,27 @@ export default function Requests() {
   const focus = useQuery({ queryKey: [me?.workspace_id, 'agenda'], enabled: !!me, queryFn: async () => ({ items: await loadWidgetEvents(path => api.get(path)), next_cursor: null, counts: {} }), refetchInterval: 30000 });
   const nextEvent = focus.data ? createWidgetSnapshot(focus.data.items, me?.workspace_id || '', me?.timezone || 'Asia/Kolkata').events[0] : undefined;
   const mailboxIssue = !!mailbox.error || ['error', 'reconnect_required', 'disconnected'].includes(mailbox.data?.status || '');
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'test') return;
+    if (mailbox.data?.status === 'connected' && !autoSyncedRef.current) {
+      autoSyncedRef.current = true;
+      api.post('/mailbox/sync').catch(() => {});
+    }
+  }, [mailbox.data?.status]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'test') return;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active' && mailbox.data?.status === 'connected') {
+        api.post('/mailbox/sync').catch(() => {});
+        query.refetch();
+        mailbox.refetch();
+        focus.refetch();
+      }
+    });
+    return () => sub.remove();
+  }, [mailbox.data?.status]);
   useEffect(() => {
     if (requestedAfter === undefined) return;
     if (mailbox.data?.status === 'connected' && mailbox.data.last_synced && mailbox.data.last_synced !== requestedAfter && mailbox.data.queued === 0) {
