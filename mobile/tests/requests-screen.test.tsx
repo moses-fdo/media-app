@@ -48,3 +48,14 @@ test('queued sync feedback changes only after a new successful sync with an empt
  await fireEvent.press(screen.getByRole('button',{name:'Sync mailbox'}));
  await waitFor(()=>expect(screen.getByText('Gmail and request processing are up to date.')).toBeTruthy());
 });
+
+test('review tab preserves search and equipment filters',async()=>{
+ await show();
+ await fireEvent.changeText(screen.getByLabelText('Search requests'),'Convocation');
+ await fireEvent.press(screen.getByRole('button',{name:'Filter requests'}));
+ await fireEvent.press(screen.getByRole('radio',{name:'Audio'}));
+ await fireEvent.press(screen.getByRole('tab',{name:'Review requests'}));
+ expect(mockPath).toContain('tab=needs_review');
+ expect(mockPath).toContain('q=Convocation');
+ expect(mockPath).toContain('department=audio');
+});

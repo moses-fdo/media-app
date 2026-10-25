@@ -39,3 +39,15 @@ Use one focused step per screen, a 560dp content width, flat explanatory rows, a
 ## Phone usability refinement
 
 Use descriptive section headings in forms, native date/time controls and a stronger semantic input outline. Date/time and equipment rows stack on narrow screens or enlarged text. Calendar days retain at least 48dp width with horizontal scrolling when necessary; enlarge calendar cells and tab bars with text scale. Reduce-motion users receive immediate press feedback. Destructive draft choices use an accessible cross-platform dialog; saved drafts always preserve the original edit version. Routine sync timestamps stay quiet; recovery actions are prominent.
+
+## Editorial Desk refinement — 25 October 2026
+
+The selected Editorial Desk Requests/detail direction and matching Agenda comp refine the existing paper/charcoal/cobalt system. Keep its palette, split-stem K, flat rows, shared theme and responsive safeguards. The wordmark now uses readable mixed-case text beside the existing mark.
+
+Requests keeps the next-event preview compact so search, Active/Review/Done tabs and event rows receive priority. Titles remain dominant; organizer and equipment text align with the metadata text rather than its icons. Selected tab counts use a restrained accent tint. Review retains search and department filters.
+
+Agenda shares the Requests avatar/settings header, adds an outlined Today control, and strengthens the selected date, event dots and time-column hierarchy. Event rows use a cobalt rule, readable venue/organizer metadata and a chevron. The list-footer New request action uses the selected date even when that day already has events. Below 360px or with enlarged text, event time stacks above its details; the calendar remains horizontally scrollable when needed.
+
+Details uses a larger title, quiet organizer/location/date metadata, a plain Edit action and a ruled deadline row with semantic deadline text. Equipment and anchored lifecycle actions remain intact. Bottom navigation labels are slightly larger.
+
+Current documentation drift: the earlier 32px detail-title and amber-strip description above predates this refinement; the implemented title is 34px and the deadline row has a transparent background. These are local screen refinements, not new global tokens. The existing document structure and design sidecar have not been normalized or regenerated. See `../docs/ui-concepts/EDITORIAL-VALIDATION.md` for evidence and limits.

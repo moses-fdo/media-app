@@ -9,5 +9,5 @@ export function BrandMark({ size = 32 }: { size?: number }) {
 }
 
 export function Brand() {
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><BrandMark /><View><Label bold size={12} style={{ letterSpacing: 2, lineHeight: 17 }}>KARUNYA</Label><Label bold size={12} style={{ letterSpacing: 1.4, lineHeight: 17 }}>MEDIA DESK</Label></View></View>;
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><BrandMark /><View><Label bold size={15} style={{ letterSpacing: -0.3, lineHeight: 18 }}>Karunya</Label><Label bold size={15} style={{ letterSpacing: -0.3, lineHeight: 18 }}>Media Desk</Label></View></View>;
 }

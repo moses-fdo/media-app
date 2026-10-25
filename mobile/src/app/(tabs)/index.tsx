@@ -137,9 +137,9 @@ export default function Requests() {
         ListHeaderComponent={<View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Brand />
-            <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push('/settings')} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}><View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }}><Label size={16}>{me?.name?.[0] || 'M'}</Label></View></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push('/settings')} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}><View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }}><Label size={16}>{me?.name?.[0] || 'M'}</Label></View></Pressable>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 26 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
             <Label size={36} bold accessibilityRole="header" style={{ letterSpacing: -1 }}>Requests</Label>
             <Button title="New" icon={<Plus color={c.onAccent} size={20} />} onPress={() => router.push('/requests/new')} style={{ minHeight: 48, paddingHorizontal: 14, paddingVertical: 9 }} />
           </View>
@@ -149,11 +149,11 @@ export default function Requests() {
           </View>
           {mailboxIssue && <View style={{ padding: 14, backgroundColor: c.amberSoft, borderRadius: 12, gap: 10, marginBottom: 16 }}><Label size={14} style={{ color: c.amber }}>{mailbox.error ? 'Your saved requests are still available. Check your connection and retry.' : me?.role === 'admin' ? 'Review the Gmail connection to keep requests up to date.' : 'Ask your administrator to check the shared Gmail connection.'}</Label><Button title="Review Gmail connection" quiet onPress={() => router.push('/settings/mailbox')} /></View>}
           {!!syncNotice && <Label size={13} muted accessibilityLiveRegion="polite" style={{ marginBottom: 16 }}>{syncNotice}</Label>}
-          {!search && !department && tab === 'active' && <View style={{ gap: 12, paddingBottom: 24 }}>
-            {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.line, gap: 6 }}><Label size={13} style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={23} bold>{nextEvent.title}</Label><Label size={14}>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label><Label size={14} muted>{nextEvent.venue}</Label></Pressable>}
+          {!search && !department && tab === 'active' && <View style={{ gap: 12, paddingBottom: 12 }}>
+            {nextEvent && <Pressable accessibilityRole="button" accessibilityLabel={`Next event: ${nextEvent.title}`} onPress={() => router.push('/requests/' + nextEvent.id)} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line, gap: 3 }}><Label size={13} style={{ color: c.blue }}>Next event{focus.isError ? ' · Saved information' : ''}</Label><Label size={17} bold>{nextEvent.title}</Label><Label size={13} muted>{dateLabel(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')} · {clock(new Date(nextEvent.startsAt).toISOString(), me?.timezone || 'Asia/Kolkata')}</Label></Pressable>}
           </View>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surfaceSubtle, borderRadius: 10, borderWidth: 1, borderColor: c.line, paddingHorizontal: 12 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surfaceSubtle, borderRadius: 12, paddingHorizontal: 14 }}>
               <Search size={18} color={c.muted} />
               <TextInput accessibilityLabel="Search requests" value={search} onChangeText={value => { setSearch(value); resetPage(); }} placeholder="Search requests" placeholderTextColor={c.muted} style={{ flex: 1, minWidth: 0, minHeight: 48, fontSize: 15, color: c.ink }} />
               {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setSearch(''); resetPage(); }} style={{ minHeight: 48, width: 48, alignItems: 'center', justifyContent: 'center' }}><X size={17} color={c.muted} /></Pressable>}
@@ -163,12 +163,12 @@ export default function Requests() {
           {(!!search || !!department) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 8 }}><Label size={13} style={{ flex: 1, color: c.blue }}>{department ? department[0].toUpperCase() + department.slice(1) + ' equipment' : 'All equipment'}{search ? ` · “${search}”` : ''}</Label><Button title="Clear filters" quiet onPress={() => { setSearch(''); setDepartment(''); resetPage(); }} /></View>}
           {filtersOpen && <View style={{ paddingTop: 14, gap: 8 }}><Label size={12} muted>Equipment department</Label><View accessibilityRole="radiogroup" accessibilityLabel="Equipment department" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[['', 'All'], ['audio', 'Audio'], ['video', 'Video'], ['other', 'Other']].map(([key, label]) => <Pressable key={key} accessibilityRole="radio" accessibilityLabel={label} aria-checked={department === key} accessibilityState={{ checked: department === key }} onPress={() => { setDepartment(key); resetPage(); }} style={{ flex: 1, minWidth: 64, minHeight: 48, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: department === key ? c.blueSoft : c.surfaceSubtle }}><Label size={13} bold={department === key} style={{ color: department === key ? c.blue : c.muted }}>{label}</Label></Pressable>)}</View></View>}
           <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, marginTop: 18 }}>
-            {[['active', 'Active'], ['completed', 'Done']].map(([key, label]) => {
-              const countVal = key === 'active' ? visibleItems.length : (query.data?.counts?.[key] ?? '');
+            {[['active', 'Active'], ['needs_review', 'Review'], ['completed', 'Done']].map(([key, label]) => {
+              const countVal = query.data?.counts?.[key] ?? (key === tab ? visibleItems.length : '');
               return (
                 <Pressable key={key} accessibilityRole="tab" accessibilityLabel={`${label} requests`} aria-selected={tab === key} accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); resetPage(); }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? c.blue : 'transparent' }}>
                   <Label bold={tab === key} size={15} style={{ color: tab === key ? c.blue : c.muted }}>{label}</Label>
-                  <Label size={13} style={{ color: tab === key ? c.blue : c.muted }}>{countVal}</Label>
+                  <Label size={12} bold style={{ color: tab === key ? c.blue : c.muted, backgroundColor: tab === key ? c.blueSoft : 'transparent', paddingHorizontal: 6, borderRadius: 6 }}>{countVal}</Label>
                 </Pressable>
               );
             })}
@@ -177,12 +177,14 @@ export default function Requests() {
           {(!!query.error || !!syncError) && <Button title="Retry loading requests" quiet busy={activeSync} onPress={refresh} style={{ marginTop: 12 }} />}
           {query.offline && <Label size={13} style={{ color: c.amber, marginTop: 12 }}>Offline · Showing saved requests</Label>}
         </View>}
-        renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.line }}><Label bold size={15} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.ink }}>{section.title}</Label><Label muted size={12}>{section.data.length} {section.data.length === 1 ? 'event' : 'events'}</Label></View>}
+        renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 4 }}><Label bold size={13} accessibilityRole="header" style={{ color: section.title === 'Overdue' ? c.red : c.muted }}>{section.title}</Label><Label muted size={12}>{section.data.length} {section.data.length === 1 ? 'event' : 'events'}</Label></View>}
         renderItem={({ item }) => <RequestRow item={item} onPress={() => router.push('/requests/' + item.id)} />}
         ListEmptyComponent={query.isLoading ? <ActivityIndicator style={{ margin: 48 }} color={c.blue} /> : <Empty
           title={
             search || department
               ? 'No matching requests'
+              : tab === 'needs_review'
+              ? 'No requests need review'
               : tab === 'completed'
               ? 'No completed requests yet'
               : 'No active requests'
@@ -190,6 +192,8 @@ export default function Requests() {
           body={
             search || department
               ? 'Clear the filters to see all requests, or try another search.'
+              : tab === 'needs_review'
+              ? 'Requests with details to confirm or new email updates will appear here.'
               : tab === 'completed'
               ? 'Events you complete or cancel will appear here.'
               : mailboxIssue

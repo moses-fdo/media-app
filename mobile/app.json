@@ -2,7 +2,7 @@
   "expo": {
     "name": "Karunya Media Desk",
     "slug": "karunya-media-desk",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "default",
     "icon": "./assets/images/karunya-k-icon.png",
     "scheme": "mediaops",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.mediaops.staff"
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#F8F8F5",
         "foregroundImage": "./assets/images/karunya-k-adaptive.png",

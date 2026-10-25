@@ -97,6 +97,17 @@ def callback(request:Request,state:str='',code:str='',error:str='',db=Depends(ge
             w=db.scalar(select(Workspace))
             if not w: w=Workspace(timezone=c.workspace_timezone);db.add(w);db.flush()
             member=Member(workspace_id=w.id,email=identity['email'].lower(),role='admin',name=identity.get('name','Administrator'));db.add(member);db.flush()
+        if not member and c.domain_auto_join:
+            # Join only the configured administrator's workspace; never pick an
+            # arbitrary workspace or elevate a new domain member to administrator.
+            admin=db.scalar(select(Member).where(Member.email==c.admin_email.strip().lower(),Member.active==True,Member.role=='admin'))
+            if not admin:
+                err_msg='Shared workspace is not ready. Ask the administrator to sign in first.'
+                if custom_redirect:
+                    return RedirectResponse(f"{target_redirect}{sep}{urlencode({'error':err_msg})}")
+                raise HTTPException(503,err_msg)
+            member=Member(workspace_id=admin.workspace_id,email=identity['email'].lower(),role='staff',name=identity.get('name') or 'Staff')
+            db.add(member);db.flush()
         if not member or not member.active:
             err_msg='Ask your administrator to grant staff access'
             if custom_redirect:

@@ -1,5 +1,16 @@
 # Physical Android phone build — 25 October 2026
 
+## Latest package — Editorial Desk UI
+
+Latest APK: `build/karunya-media-desk-1.1.1.apk`, also copied to `build/karunya-media-desk-phone.apk`. Package `com.mediaops.staff`, version **1.1.1 (3)**. Includes the Editorial Desk Requests, Agenda and detail refinement.
+
+TypeScript and all **75 tests across 24 suites passed**. Gradle assembleRelease succeeded. APK archive integrity and v2 signature verified; certificate matches the previous internal debug-signed package. Hosted HTTPS API is bundled, with no local/emulator API or demo-login endpoint. ARM64 and 32-bit ARM libraries; minimum API 24, target 36. Firebase configuration included through the configured build. No connected Android device: installation, login and notification delivery remain unverified on hardware.
+
+Size: **53,185,682 bytes**. SHA-256: `4dd12fb38b8bb654804b556eb517ed3f18af19d1e58c125a3899f7088caeb82d`.
+
+## Previous 1.1.0 package
+
+
 Latest installable internal-testing APK: `build/karunya-media-desk-1.1.0.apk` (also available as `build/karunya-media-desk-phone.apk`).
 
 - Package `com.mediaops.staff`, version **1.1.0 (2)**. Minimum Android API 24, target API 36. ARM64 and 32-bit ARM libraries.

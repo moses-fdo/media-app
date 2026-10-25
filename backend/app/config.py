@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 from typing import Literal
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
     workspace_timezone: str = 'Asia/Kolkata'
     source_retention_days: int = Field(default=90, ge=1, le=3650)
     allowed_domain: str = ''
+    domain_auto_join: bool = False
     cors_origins: str = 'http://localhost:8081,http://localhost:8082'
     in_process_sync: bool | None = None
     rate_limit_enabled: bool | None = None
@@ -40,6 +42,12 @@ class Settings(BaseSettings):
                 Fernet(self.encryption_key.encode())
             except (ValueError, TypeError):
                 raise ValueError('ENCRYPTION_KEY must be a valid Fernet key')
+        self.allowed_domain = self.allowed_domain.strip().lower()
+        if self.domain_auto_join:
+            if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}', self.allowed_domain):
+                raise ValueError('DOMAIN_AUTO_JOIN requires an explicit ALLOWED_DOMAIN')
+            if not self.admin_email or self.admin_email.strip().lower().rsplit('@', 1)[-1] != self.allowed_domain:
+                raise ValueError('DOMAIN_AUTO_JOIN requires ADMIN_EMAIL within ALLOWED_DOMAIN')
         production = self.environment == 'production'
         if self.in_process_sync is None:
             self.in_process_sync = self.environment == 'development'

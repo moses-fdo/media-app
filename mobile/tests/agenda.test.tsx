@@ -37,3 +37,10 @@ test('month navigation changes the grid and offers a date-prefilled request on a
   await fireEvent.press(screen.getByRole('button', { name: 'Add request' }));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/requests/new', params: { date: '2026-12-16' } });
 });
+
+test('new requests use the selected agenda date even when events exist', async () => {
+  const { router } = require('expo-router');
+  await render(<ThemeProvider><Agenda /></ThemeProvider>);
+  await fireEvent.press(screen.getByRole('button', { name: 'New request' }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/requests/new', params: { date: '2026-11-15' } });
+});

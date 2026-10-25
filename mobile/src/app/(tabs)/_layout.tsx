@@ -30,13 +30,13 @@ export default function TabsLayout() {
         tabBarActiveTintColor: c.blue,
         tabBarInactiveTintColor: c.muted,
         tabBarStyle: {
-          height: Math.max(64, 48 + 16 * fontScale) + insets.bottom,
+          height: Math.max(76, 56 + 20 * fontScale) + insets.bottom,
           backgroundColor: c.bg,
           borderTopColor: c.line,
           borderTopWidth: 1,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: '500',
         },
         tabBarItemStyle: {

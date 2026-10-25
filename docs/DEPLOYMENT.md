@@ -45,3 +45,17 @@ The retention job expires processed source bodies/attachments after `SOURCE_RETE
 Follow `mobile/RELEASE.md`. Preview APKs use debug signing and are for internal testing. A signed production release needs the operator's private keystore, public HTTPS API, demo disabled, platform push credentials and physical-device checks. EAS CLI is an optional external release tool, not an application dependency.
 
 See `PRODUCTION-HARDENING.md` and `RELEASE-READINESS.md` for current verification and remaining publication gates.
+
+## Automatic Karunya domain registration
+
+To allow verified `@karunya.edu.in` Google accounts into the shared department workspace, deploy the current backend and configure:
+
+```dotenv
+ALLOWED_DOMAIN=karunya.edu.in
+DOMAIN_AUTO_JOIN=true
+ADMIN_EMAIL=<the existing workspace administrator email>
+```
+
+Keep the existing administrator email rather than changing workspace ownership. The configured administrator must be active with role `admin` and must sign in first if the workspace has not yet been initialized. New domain members receive only the `staff` role in that administrator's workspace. Existing memberships are retained; inactive members stay blocked. Other domains, subdomains and unverified accounts are rejected. Administrators still manage members and connect/reconnect the shared Gmail mailbox. No APK rebuild or database migration is required.
+
+The flag defaults to false, retaining invitation-only access unless explicitly enabled. On the hosted service, save these environment settings and deploy this source revision. Code changes alone do not change the running server. This repository does not identify students versus employees within a shared email domain: enabling domain registration admits every verified account on that domain.

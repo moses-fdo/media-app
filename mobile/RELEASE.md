@@ -116,3 +116,7 @@ Version 1.1.0 (2) is available at `../build/karunya-media-desk-1.1.0.apk`. The s
 ## Required Firebase configuration for the next Android build
 
 The 1.1.0 APK exposed missing Firebase initialization when enabling notifications. Android phone builds now require google-services.json for `com.mediaops.staff`, provided at the mobile root or through GOOGLE_SERVICES_JSON. Expo's FCM V1 sender credentials must also be configured privately before delivery can work. See `../docs/ANDROID-PUSH-SETUP.md`. The source has clearer configuration errors and cold-start sign-in handling; these are not yet in a replacement APK.
+
+## Editorial Desk package — 25 October 2026
+
+Version **1.1.1 (3)** is at `../build/karunya-media-desk-1.1.1.apk` and the stable phone APK path. It includes the latest Editorial Desk UI and configured Firebase resources. Build, package and signature checks passed; see `../docs/PHONE-BUILD.md`. No hardware install or push delivery was verified.

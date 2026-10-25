@@ -195,9 +195,7 @@ export default function Detail() {
                 minHeight: 48,
                 paddingVertical: 10,
                 borderRadius: radius.md,
-                backgroundColor: c.surfaceSubtle,
-                borderWidth: 1,
-                borderColor: c.line,
+                backgroundColor: 'transparent',
               }}
             >
               <Pencil size={15} color={c.blue} />
@@ -207,7 +205,7 @@ export default function Detail() {
             </AnimatedPressable>
           </View>
 
-          <Label size={32} bold style={{ lineHeight: 39, letterSpacing: -0.8, color: c.ink }}>
+          <Label size={34} bold style={{ lineHeight: 42, letterSpacing: -0.8, color: c.ink }}>
             {r.title}
           </Label>
 
@@ -220,12 +218,9 @@ export default function Detail() {
               paddingVertical: 8,
             }}
           >
-            <User size={18} color={c.blue} />
+            <User size={19} color={c.muted} />
             <View style={{ flex: 1 }}>
-              <Label size={12} muted>
-                Requested by
-              </Label>
-              <Label bold size={15}>
+              <Label size={16}>
                 {r.organizer || 'Organizer to confirm'}
               </Label>
             </View>
@@ -240,16 +235,14 @@ export default function Detail() {
           >
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <MapPin size={18} color={c.muted} />
-              <Label size={15} bold style={{ flex: 1 }}>
+              <Label size={16} style={{ flex: 1 }}>
                 {r.venue || 'Venue to confirm'}
               </Label>
             </View>
 
-            <View style={{ height: 1, backgroundColor: c.line }} />
-
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <CalendarDays size={18} color={c.muted} />
-              <Label size={16} bold style={{ flex: 1 }}>
+              <Label size={16} style={{ flex: 1 }}>
                 {dateLabel(r.event_start, r.timezone)}
                 {r.event_start ? ' · ' + clock(r.event_start, r.timezone) : ''}
               </Label>
@@ -259,9 +252,10 @@ export default function Detail() {
           {/* Setup Deadline Banner */}
           <View
             style={{
-              backgroundColor: overdue ? c.redSoft : c.amberSoft,
-              padding: 16,
-              borderRadius: radius.lg,
+              backgroundColor: 'transparent',
+              paddingVertical: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: c.line,
               flexDirection: 'row',
               gap: 12,
               alignItems: 'center',
@@ -481,7 +475,7 @@ export default function Detail() {
           paddingBottom: Math.max(insets.bottom, 16),
           borderTopWidth: 1,
           borderTopColor: c.line,
-          backgroundColor: c.surface,
+          backgroundColor: c.bg,
         }}
       >
         <View
