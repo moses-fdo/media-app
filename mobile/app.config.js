@@ -14,7 +14,7 @@ module.exports = ({ config }) => {
       throw new Error('Set EXPO_PUBLIC_DEMO_ENABLED=false for production.');
     }
   }
-  const googleServicesFile = process.env.GOOGLE_SERVICES_JSON || config.android?.googleServicesFile || (fs.existsSync(path.join(__dirname, 'google-services.json')) ? './google-services.json' : undefined);
+  const googleServicesFile = process.env.GOOGLE_SERVICES_JSON === 'none' ? undefined : (process.env.GOOGLE_SERVICES_JSON || config.android?.googleServicesFile || (fs.existsSync(path.join(__dirname, 'google-services.json')) ? './google-services.json' : undefined));
   if (googleServicesFile) {
     let firebase;
     try { firebase = JSON.parse(fs.readFileSync(path.resolve(__dirname, googleServicesFile), 'utf8')); }

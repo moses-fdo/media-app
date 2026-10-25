@@ -9,6 +9,7 @@ afterEach(()=>{process.env={...savedEnv};rmSync(folder,{recursive:true,force:tru
 const config={android:{package:'com.mediaops.staff'},extra:{eas:{projectId:'existing-project'}}};
 test('an Android push build cannot silently omit Firebase registration',()=>{
  process.env.REQUIRE_ANDROID_PUSH='true';
+ process.env.GOOGLE_SERVICES_JSON='none';
  expect(()=>configure({config})).toThrow('google-services.json');
 });
 test('a matching Firebase client is included while preserving existing Expo project settings',()=>{
