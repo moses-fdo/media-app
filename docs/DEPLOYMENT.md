@@ -71,3 +71,9 @@ Existing users sign in again. They receive a private workspace and import their 
 Use the updated mobile app for the personal interface. New personal accounts open Requests directly; the existing automatic mailbox sync imports their own mail. Gmail connection, optional reminders and widget preferences remain available from Settings. Google consent is still required. Redis, a running worker/scheduler and the hosted HTTPS API remain required for deployed background synchronization.
 
 Verification: 123 backend tests passed (one optional external-service integration skipped), 78 mobile tests passed, TypeScript passed. A migration regression covers upgrading an existing 002 database without deleting earlier workspaces. Google OAuth protocol reference: https://developers.google.com/identity/protocols/oauth2/web-server. Live Google consent and phone integration require actual account/device validation.
+
+## Local browser against the hosted API
+
+For the Expo web app at `http://localhost:8081/sign-in`, set `LOCAL_BROWSER_ORIGINS=http://localhost:8081` in the API service environment and redeploy this revision. Keep `CORS_ORIGINS` set to the deployed public HTTPS frontend origin(s); do not put localhost into that production-only field. The local setting accepts exact loopback origins with explicit ports, and is empty by default. No paths or trailing slashes. It is used for both browser CORS and the post-consent app return address. The Google OAuth callback remains the hosted HTTPS `/api/v1/auth/callback` URL.
+
+A browser may report a blocked CORS preflight as “Unable to reach the server” even while `/health` returns 200. Verify that an OPTIONS request from the configured local Origin returns `Access-Control-Allow-Origin` with that exact origin. Other local ports stay blocked. No APK rebuild is needed.

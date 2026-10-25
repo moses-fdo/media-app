@@ -49,7 +49,7 @@ def create_app(settings=None):
     if settings.environment != 'production':
         Base.metadata.create_all(app.state.engine)
     app.add_middleware(RequestGuards, settings=settings)
-    app.add_middleware(CORSMiddleware, allow_origins=[value.strip() for value in settings.cors_origins.split(',') if value.strip()], allow_methods=['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allow_headers=['Authorization', 'Content-Type'])
+    app.add_middleware(CORSMiddleware, allow_origins=settings.browser_origins, allow_methods=['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allow_headers=['Authorization', 'Content-Type'])
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):

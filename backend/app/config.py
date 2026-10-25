@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     domain_auto_join: bool = False
     personal_accounts: bool | None = None
     cors_origins: str = 'http://localhost:8081,http://localhost:8082'
+    local_browser_origins: str = ''
     in_process_sync: bool | None = None
     rate_limit_enabled: bool | None = None
     auth_requests_per_minute: int = Field(default=30, ge=1)
@@ -51,6 +52,14 @@ class Settings(BaseSettings):
                 raise ValueError('DOMAIN_AUTO_JOIN requires an explicit ALLOWED_DOMAIN')
             if not self.admin_email or self.admin_email.strip().lower().rsplit('@', 1)[-1] != self.allowed_domain:
                 raise ValueError('DOMAIN_AUTO_JOIN requires ADMIN_EMAIL within ALLOWED_DOMAIN')
+        for value in self.local_browser_origins.split(','):
+            if not value.strip():
+                continue
+            parsed = urlsplit(value.strip())
+            if (parsed.scheme not in ('http', 'https') or parsed.hostname not in ('localhost', '127.0.0.1', '::1')
+                    or not parsed.port or parsed.path or parsed.query or parsed.fragment
+                    or parsed.username is not None or parsed.password is not None or '*' in value):
+                raise ValueError('LOCAL_BROWSER_ORIGINS must contain exact loopback origins with explicit ports and no paths')
         production = self.environment == 'production'
         if self.in_process_sync is None:
             self.in_process_sync = self.environment == 'development'
@@ -74,6 +83,11 @@ class Settings(BaseSettings):
                 raise ValueError('Production requires explicit CORS origins, distributed workers and rate limiting')
         return self
 
+    @property
+    def browser_origins(self):
+        return list(dict.fromkeys(origin.strip() for origin in
+                                 (self.cors_origins + ',' + self.local_browser_origins).split(',') if origin.strip()))
+
     def valid_client_redirect(self, value):
         if not value:
             return True
@@ -84,4 +98,4 @@ class Settings(BaseSettings):
         if value in exact:
             return True
         origin = f'{parsed.scheme}://{parsed.netloc}'
-        return parsed.scheme in ('http', 'https') and origin in [item.strip() for item in self.cors_origins.split(',')]
+        return parsed.scheme in ('http', 'https') and origin in self.browser_origins
